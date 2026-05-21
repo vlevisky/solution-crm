@@ -500,6 +500,139 @@ function migrateDisplayData(data) {
   })
   const robotStage = byId(data.stages, 'stage_n8n')
   if (robotStage) robotStage.name = 'N8N / Robô'
+  const demoPatients = [
+    ['contact_1', 'Camila Andrade', '+55 11 98222-1401', 'camila.andrade@email.com', 'channel_1', 'dep_consultorios', ['tag_2'], 'stage_audio', 'user_cardio', 'Consulta cardiológica agendada pela secretaria.'],
+    ['contact_2', 'João Pedro Lima', '+55 11 97777-8831', 'joao.lima@email.com', 'channel_1', 'dep_consultorios', ['tag_3'], 'stage_audio', 'user_admin', 'Remarcação concluída com confirmação do paciente.'],
+    ['contact_3', 'Márcia Figueiredo', '+55 11 96666-2209', 'marcia.fig@email.com', 'channel_2', 'dep_exames', ['tag_5'], 'stage_aulas', 'user_cardio', 'Orientações de preparo para exame enviadas pela secretaria.'],
+    ['contact_4', 'Roberto Santana', '+55 11 95555-0192', 'roberto.santana@email.com', 'channel_1', 'dep_cirurgico', ['tag_4'], 'stage_prova', 'user_ortopedia', 'Checklist pré-operatório confirmado com o paciente.'],
+    ['contact_5', 'Patrícia Gomes', '+55 11 94444-7820', 'patricia.gomes@email.com', 'channel_1', 'dep_triagem', ['tag_1'], 'stage_n8n', 'user_admin', 'Paciente solicitou informações de convênio e aguarda retorno.'],
+    ['contact_6', 'Fernanda Rocha', '+55 11 93333-6142', 'fernanda.rocha@email.com', 'channel_1', 'dep_consultorios', ['tag_1'], 'stage_audio', 'user_cardio', 'Consulta de retorno cardiológico marcada pela secretaria.'],
+    ['contact_7', 'Lucas Martins', '+55 11 92222-4808', 'lucas.martins@email.com', 'channel_3', 'dep_cirurgico', ['tag_4'], 'stage_prova', 'user_ortopedia', 'Avaliação ortopédica pré-cirúrgica em andamento.'],
+    ['contact_8', 'Helena Duarte', '+55 11 91111-7635', 'helena.duarte@email.com', 'channel_4', 'dep_consultorios', ['tag_2'], 'stage_audio', 'user_admin', 'Primeira consulta marcada via formulário do site.'],
+    ['contact_9', 'Bruno Carvalho', '+55 11 90000-3377', 'bruno.carvalho@email.com', 'channel_1', 'dep_exames', ['tag_5'], 'stage_aulas', 'user_cardio', 'Exame cardiológico confirmado com preparo enviado.'],
+    ['contact_10', 'Sofia Almeida', '+55 11 98888-4410', 'sofia.almeida@email.com', 'channel_5', 'dep_consultorios', ['tag_3'], 'stage_audio', 'user_ortopedia', 'Retorno pós-operatório marcado pela secretaria.'],
+  ]
+  demoPatients.forEach(([contactId, name, phone, email, channelId, departmentId, tagIds, stageId, assignedUserId, description], index) => {
+    const baseDate = '2026-05-20T12:00:00.000Z'
+    const contactPayload = { id: contactId, workspaceId: 'workspace_solution', name, phone: normalizePhone(phone), email, avatarUrl: '', channelId, departmentId, tagIds, createdAt: baseDate, updatedAt: baseDate }
+    const contact = byId(data.contacts, contactId)
+    if (contact) Object.assign(contact, contactPayload)
+    else data.contacts.push(contactPayload)
+    const cardId = `card_${index + 1}`
+    const cardPayload = {
+      id: cardId,
+      workspaceId: 'workspace_solution',
+      title: `Paciente - ${name}`,
+      description,
+      contactId,
+      phone: normalizePhone(phone),
+      funnelId: 'funnel_gravacao',
+      stageId,
+      departmentId,
+      channelId,
+      assignedUserId,
+      priority: index === 3 || index === 6 ? 'alta' : 'normal',
+      status: 'aberto',
+      value: 0,
+      position: index,
+      dueAt: '',
+      lastMessageAt: new Date(new Date(baseDate).getTime() + index * 18 * 60000).toISOString(),
+      tagIds,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+    }
+    const card = byId(data.cards, cardId)
+    if (card) Object.assign(card, cardPayload)
+    else data.cards.push(cardPayload)
+  })
+  const secretaryConversations = [
+    [
+      ['outbound', 'Oi, aqui é a secretaria da Clínica Solution falando em nome da Dra. Helena. Vi que você pediu uma consulta de cardiologia. Posso te passar os horários disponíveis?'],
+      ['inbound', 'Pode sim, prefiro de manhã.'],
+      ['outbound', 'Perfeito. Temos amanhã às 09:00 ou quinta às 10:30. Qual fica melhor para você?'],
+      ['inbound', 'Amanhã às 09:00.'],
+      ['outbound', 'Combinado, Camila. Sua consulta com a Dra. Helena ficou marcada para amanhã às 09:00. Por favor, traga exames anteriores e lista de medicamentos.'],
+    ],
+    [
+      ['outbound', 'Oi João, aqui é a secretaria da Clínica Solution. Você pediu para remarcar sua consulta de hoje. Ainda posso te ajudar?'],
+      ['inbound', 'Sim, hoje não consigo ir.'],
+      ['outbound', 'Sem problema. Tenho quinta às 15:00 ou sexta às 08:30 para remarcação.'],
+      ['inbound', 'Quinta às 15:00.'],
+      ['outbound', 'Remarcação feita para quinta às 15:00. Vou deixar tudo anotado no seu atendimento.'],
+    ],
+    [
+      ['outbound', 'Oi Márcia, aqui é a secretaria da Clínica Solution. Estou enviando as orientações do exame solicitado pela Dra. Helena.'],
+      ['inbound', 'Obrigada. Precisa de jejum?'],
+      ['outbound', 'Para o risco cirúrgico não precisa jejum, mas leve documento com foto, exames anteriores e chegue 20 minutos antes.'],
+      ['inbound', 'Perfeito, confirmo minha presença.'],
+      ['outbound', 'Presença confirmada. Qualquer dúvida pode responder por aqui.'],
+    ],
+    [
+      ['outbound', 'Oi Roberto, aqui é a secretaria do Dr. Rafael. Estou confirmando sua cirurgia de joelho de sexta às 13:00.'],
+      ['inbound', 'Está confirmada. Qual horário preciso chegar?'],
+      ['outbound', 'Chegue às 11:30, com jejum de 8 horas, documento, exames e autorização do convênio.'],
+      ['inbound', 'Tudo certo, obrigado.'],
+      ['outbound', 'Perfeito. O Dr. Rafael já está com seu atendimento atualizado.'],
+    ],
+    [
+      ['outbound', 'Oi Patrícia, aqui é a secretaria da Clínica Solution. Recebemos sua dúvida sobre cobertura do convênio para ortopedia.'],
+      ['inbound', 'Isso, queria saber se cobre a consulta.'],
+      ['outbound', 'Vou conferir com o financeiro e te retorno por aqui. Se preferir, também posso deixar um pré-agendamento reservado.'],
+      ['inbound', 'Pode reservar, por favor.'],
+      ['outbound', 'Reservado. Assim que o convênio confirmar, finalizamos o horário.'],
+    ],
+    [
+      ['outbound', 'Oi Fernanda, aqui é a secretaria da Dra. Helena. Ela pediu para agendarmos seu retorno cardiológico.'],
+      ['inbound', 'Tenho disponibilidade terça depois das 14h.'],
+      ['outbound', 'Temos terça às 14:30 ou 16:00.'],
+      ['inbound', '14:30 fica ótimo.'],
+      ['outbound', 'Retorno marcado para terça às 14:30 com a Dra. Helena.'],
+    ],
+    [
+      ['outbound', 'Oi Lucas, aqui é a secretaria do Dr. Rafael. Recebemos seu pedido de avaliação ortopédica.'],
+      ['inbound', 'Preciso ver meu joelho antes da cirurgia.'],
+      ['outbound', 'Conseguimos te encaixar quarta às 11:00 para avaliação pré-cirúrgica. Pode ser?'],
+      ['inbound', 'Pode sim.'],
+      ['outbound', 'Agendado. Traga os exames de imagem para o Dr. Rafael avaliar.'],
+    ],
+    [
+      ['outbound', 'Oi Helena, aqui é a secretaria da Clínica Solution. Você enviou um formulário pelo site solicitando primeira consulta.'],
+      ['inbound', 'Sim, gostaria de clínica geral.'],
+      ['outbound', 'Temos amanhã às 16:00 ou sexta às 09:30.'],
+      ['inbound', 'Sexta às 09:30.'],
+      ['outbound', 'Consulta marcada para sexta às 09:30. Vou enviar a confirmação por aqui.'],
+    ],
+    [
+      ['outbound', 'Oi Bruno, aqui é a secretaria da Dra. Helena. Seu exame cardiológico está pré-agendado para segunda às 08:20.'],
+      ['inbound', 'Preciso chegar antes?'],
+      ['outbound', 'Sim, chegue 15 minutos antes para cadastro. Evite café forte antes do exame.'],
+      ['inbound', 'Certo, confirmado.'],
+      ['outbound', 'Confirmado, Bruno. Até segunda.'],
+    ],
+    [
+      ['outbound', 'Oi Sofia, aqui é a secretaria do Dr. Rafael. Vamos marcar seu retorno pós-operatório?'],
+      ['inbound', 'Sim, pode ser essa semana?'],
+      ['outbound', 'Tenho quinta às 10:00 ou sexta às 14:00.'],
+      ['inbound', 'Quinta às 10:00.'],
+      ['outbound', 'Retorno marcado para quinta às 10:00. Se sentir dor forte antes disso, responda esta mensagem.'],
+    ],
+  ]
+  data.messages = data.messages.filter((message) => !/^msg_\d+_/.test(message.id))
+  secretaryConversations.forEach((items, contactIndex) => {
+    items.forEach(([direction, body], messageIndex) => {
+      data.messages.push({
+        id: `msg_${contactIndex + 1}_${messageIndex + 1}`,
+        workspaceId: 'workspace_solution',
+        contactId: `contact_${contactIndex + 1}`,
+        cardId: `card_${contactIndex + 1}`,
+        direction,
+        body,
+        provider: direction === 'outbound' ? 'secretaria' : 'whatsapp',
+        status: direction === 'outbound' ? 'sent' : 'received',
+        createdAt: new Date(new Date('2026-05-20T12:00:00.000Z').getTime() + (contactIndex * 18 + messageIndex * 2) * 60000).toISOString(),
+      })
+    })
+  })
   return data
 }
 
@@ -527,7 +660,7 @@ function reportData(data) {
       status: card.status,
       createdAt: card.createdAt,
       updatedAt: card.updatedAt,
-      openTime: card.status === 'concluido' ? 'Encerrado' : '02:16:58',
+      openTime: card.status === 'concluido' ? 'Encerrado' : '00:08:40',
       stage: byId(data.stages, card.stageId)?.name || 'N/D',
     }
   })
@@ -546,9 +679,9 @@ function reportData(data) {
       active: openCards.filter((card) => card.lastMessageAt).length,
       receptive: data.messages.filter((message) => message.direction === 'inbound').length,
       waiting: openCards.length,
-      avgWait: '02:16:58',
-      avgService: '232:25:04',
-      activeWait: '12:59:00',
+      avgWait: '00:08:40',
+      avgService: '00:18:30',
+      activeWait: '00:04:15',
       cardsCreated: data.cards.length,
       cardsWon: closedCards.length,
       campaignsSent: data.campaigns.reduce((sum, campaign) => sum + campaign.sentCount, 0),

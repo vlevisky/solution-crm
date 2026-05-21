@@ -231,7 +231,7 @@ function reportData(data: BootstrapData): BootstrapData['reports'] {
       status: card.status,
       createdAt: card.createdAt,
       updatedAt: card.updatedAt,
-      openTime: card.status === 'concluido' ? 'Encerrado' : '02:16:58',
+      openTime: card.status === 'concluido' ? 'Encerrado' : '00:08:40',
       stage: data.stages.find((item) => item.id === card.stageId)?.name || 'N/D',
     }
   })
@@ -250,9 +250,9 @@ function reportData(data: BootstrapData): BootstrapData['reports'] {
       active: openCards.filter((card) => card.lastMessageAt).length,
       receptive: data.messages.filter((message) => message.direction === 'inbound').length,
       waiting: openCards.length,
-      avgWait: '02:16:58',
-      avgService: '232:25:04',
-      activeWait: '12:59:00',
+      avgWait: '00:08:40',
+      avgService: '00:18:30',
+      activeWait: '00:04:15',
       cardsCreated: data.cards.length,
       cardsWon: closedCards.length,
       campaignsSent: data.campaigns.reduce((sum, campaign) => sum + campaign.sentCount, 0),
