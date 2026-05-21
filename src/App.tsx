@@ -89,6 +89,8 @@ import type {
   ContactGroup,
   CrmCard,
   Department,
+  EmailMessage,
+  EmailTemplate,
   EntityId,
   Funnel,
   Message,
@@ -103,6 +105,7 @@ type Page =
   | 'crm'
   | 'robos'
   | 'campanhas'
+  | 'emails'
   | 'agendamentos'
   | 'contatos'
   | 'grupos'
@@ -113,7 +116,7 @@ type Page =
   | 'configuracoes'
   | 'perfil'
 
-type FormMode = 'card' | 'stage' | 'funnel' | 'campaign' | 'appointment' | 'contact' | 'department' | 'user' | 'group' | 'bot' | 'profile' | 'settings'
+type FormMode = 'card' | 'stage' | 'funnel' | 'campaign' | 'emailTemplate' | 'appointment' | 'contact' | 'department' | 'user' | 'group' | 'bot' | 'profile' | 'settings'
 
 type FormState = Record<string, unknown>
 
@@ -131,6 +134,7 @@ const pageTitles: Record<Page, string> = {
   crm: 'CRM',
   robos: 'Robos',
   campanhas: 'Campanhas',
+  emails: 'Emails',
   agendamentos: 'Agendamentos',
   contatos: 'Contatos',
   grupos: 'Grupos',
@@ -150,7 +154,7 @@ function isAdmin(user?: User | null) {
 
 function allowedPagesFor(user: User): Page[] {
   if (isAdmin(user)) return Object.keys(pageTitles) as Page[]
-  return ['atendimento', 'crm', 'agendamentos', 'relatorios', 'dashboard', 'perfil']
+  return ['atendimento', 'crm', 'emails', 'agendamentos', 'relatorios', 'dashboard', 'perfil']
 }
 
 function cleanMessageBody(body = '') {
@@ -267,9 +271,12 @@ function scopeDataForUser(data: BootstrapData, user: User): BootstrapData {
   const appointments = data.appointments.filter((appointment) => appointment.assignedUserId === user.id)
   const contactIds = new Set([...cards.map((card) => card.contactId), ...appointments.map((appointment) => appointment.contactId)].filter(Boolean))
   const cardIds = new Set(cards.map((card) => card.id))
-  const contacts = data.contacts.filter((contact) => contactIds.has(contact.id))
   const messages = data.messages.filter((message) => contactIds.has(message.contactId) || cardIds.has(message.cardId))
-  const scoped: BootstrapData = { ...data, cards, appointments, contacts, messages, campaigns: [], automationBots: data.automationBots.filter((bot) => bot.status === 'active'), activityLogs: data.activityLogs.filter((log) => log.userId === user.id).slice(0, 8) }
+  const emails = data.emails.filter((email) => email.assignedUserId === user.id || email.ownerUserId === user.id)
+  const emailContactIds = new Set(emails.map((email) => email.contactId).filter(Boolean))
+  const visibleContacts = data.contacts.filter((contact) => contactIds.has(contact.id) || emailContactIds.has(contact.id))
+  const emailTemplates = data.emailTemplates.filter((template) => template.ownerUserId === user.id)
+  const scoped: BootstrapData = { ...data, cards, appointments, contacts: visibleContacts, messages, emails, emailTemplates, campaigns: [], automationBots: data.automationBots.filter((bot) => bot.status === 'active'), activityLogs: data.activityLogs.filter((log) => log.userId === user.id).slice(0, 8) }
   return { ...scoped, reports: reportData(scoped) }
 }
 
@@ -412,6 +419,7 @@ function SolutionCrm() {
       stage: ['name', 'funnelId'],
       funnel: ['name'],
       campaign: ['name', 'message'],
+      emailTemplate: ['name', 'subject', 'body'],
       appointment: ['title', 'date', 'startTime', 'endTime', 'assignedUserId'],
       contact: ['name', 'phone'],
       department: ['name'],
@@ -489,6 +497,31 @@ function SolutionCrm() {
       toast.push({ type: 'success', title: 'Mensagem enviada' })
     } catch (error) {
       toast.push({ type: 'error', title: 'Falha no envio', message: error instanceof Error ? error.message : 'Erro desconhecido' })
+    }
+  }
+
+  async function sendTemplateEmail(template: EmailTemplate, contact: Contact) {
+    const user = currentUser
+    if (!user) return
+    const body = String(template.body || '')
+      .replaceAll('{{nome}}', contact.name || 'paciente')
+      .replaceAll('{{medico}}', user.name)
+    try {
+      await api.create<EmailMessage>('emails', {
+        contactId: contact.id,
+        ownerUserId: user.id,
+        assignedUserId: user.id,
+        from: user.email,
+        to: contact.email || `${contact.phone.replace(/\D/g, '')}@cliente.local`,
+        subject: template.subject,
+        body,
+        direction: 'outbound',
+        status: 'sent',
+      })
+      await refresh()
+      toast.push({ type: 'success', title: 'Email enviado', message: `${template.name} enviado para ${contact.name}` })
+    } catch (error) {
+      toast.push({ type: 'error', title: 'Falha ao enviar email', message: error instanceof Error ? error.message : 'Erro desconhecido' })
     }
   }
 
@@ -597,6 +630,17 @@ function SolutionCrm() {
               await refresh()
               toast.push({ type: 'success', title: 'Campanha simulada' })
             }}
+          />
+        ) : null}
+        {activePage === 'emails' ? (
+          <EmailsPage
+            data={visibleData}
+            lookup={visibleLookup}
+            currentUser={currentUser}
+            onCreateTemplate={() => openCreate('emailTemplate', { ownerUserId: currentUser.id })}
+            onEditTemplate={(template) => openEdit('emailTemplate', template)}
+            onDeleteTemplate={(template) => setConfirm({ resource: 'email-templates', id: template.id, title: 'Excluir template', description: `Deseja excluir ${template.name}?` })}
+            onSendTemplate={sendTemplateEmail}
           />
         ) : null}
         {activePage === 'agendamentos' ? (
@@ -710,7 +754,7 @@ function LoginPage({ data, onLogin }: { data: BootstrapData; onLogin: (email: st
 function Sidebar({ activePage, collapsed, accountName, profileName, accountScope, allowedPages, onNavigate, onToggle }: { activePage: Page; collapsed: boolean; accountName: string; profileName: string; accountScope: string; allowedPages: Page[]; onNavigate: (page: Page) => void; onToggle: () => void }) {
   const baseSections: Array<{ title: string; items: Array<{ page: Page; icon: ReactNode; label: string }> }> = [
     { title: 'PRINCIPAL', items: [{ page: 'atendimento', icon: <MessageCircle />, label: 'Atendimento' }, { page: 'crm', icon: <BriefcaseBusiness />, label: 'CRM' }, { page: 'robos', icon: <Bot />, label: 'Robos' }] },
-    { title: 'OPERACOES', items: [{ page: 'campanhas', icon: <Send />, label: 'Campanhas' }, { page: 'agendamentos', icon: <CalendarDays />, label: 'Agendamentos' }, { page: 'contatos', icon: <ClipboardList />, label: 'Contatos' }, { page: 'grupos', icon: <Users />, label: 'Grupos' }] },
+    { title: 'OPERACOES', items: [{ page: 'campanhas', icon: <Send />, label: 'Campanhas' }, { page: 'emails', icon: <Mail />, label: 'Emails' }, { page: 'agendamentos', icon: <CalendarDays />, label: 'Agendamentos' }, { page: 'contatos', icon: <ClipboardList />, label: 'Contatos' }, { page: 'grupos', icon: <Users />, label: 'Grupos' }] },
     { title: 'DADOS', items: [{ page: 'relatorios', icon: <BarChart3 />, label: 'Relatorios' }, { page: 'dashboard', icon: <LayoutDashboard />, label: 'Dashboard' }] },
     { title: 'SISTEMA', items: [{ page: 'departamentos', icon: <Inbox />, label: 'Departamentos' }, { page: 'usuarios', icon: <UserPlus />, label: 'Usuarios' }, { page: 'configuracoes', icon: <Settings />, label: 'Configuracoes' }, { page: 'perfil', icon: <CircleUserRound />, label: 'Meu Perfil' }] },
   ]
@@ -1058,6 +1102,118 @@ function CampaignsPage({ data, search, setSearch, statusFilter, setStatusFilter,
   )
 }
 
+function EmailsPage({ data, lookup, currentUser, onCreateTemplate, onEditTemplate, onDeleteTemplate, onSendTemplate }: { data: BootstrapData; lookup: Lookup; currentUser: User; onCreateTemplate: () => void; onEditTemplate: (item: EmailTemplate) => void; onDeleteTemplate: (item: EmailTemplate) => void; onSendTemplate: (template: EmailTemplate, contact: Contact) => void }) {
+  const [selectedEmailId, setSelectedEmailId] = useState(data.emails[0]?.id || '')
+  const [templateId, setTemplateId] = useState(data.emailTemplates[0]?.id || '')
+  const [contactId, setContactId] = useState(data.contacts[0]?.id || '')
+  const selectedEmail = data.emails.find((email) => email.id === selectedEmailId) || data.emails[0]
+  const selectedTemplate = data.emailTemplates.find((template) => template.id === templateId) || data.emailTemplates[0]
+  const selectedContact = data.contacts.find((contact) => contact.id === contactId) || data.contacts[0]
+  const inboundCount = data.emails.filter((email) => email.direction === 'inbound').length
+  const unreadCount = data.emails.filter((email) => email.status === 'unread').length
+  const sentCount = data.emails.filter((email) => email.direction === 'outbound').length
+  const ownedTemplates = data.emailTemplates.filter((template) => template.ownerUserId === currentUser.id || isAdmin(currentUser))
+
+  useEffect(() => {
+    if (!data.emails.some((email) => email.id === selectedEmailId)) setSelectedEmailId(data.emails[0]?.id || '')
+    if (!data.emailTemplates.some((template) => template.id === templateId)) setTemplateId(data.emailTemplates[0]?.id || '')
+    if (!data.contacts.some((contact) => contact.id === contactId)) setContactId(data.contacts[0]?.id || '')
+  }, [contactId, data.contacts, data.emailTemplates, data.emails, selectedEmailId, templateId])
+
+  return (
+    <section className="page-flow email-page">
+      <div className="page-head">
+        <PageIntro title="Emails" subtitle="Caixa de entrada por medico, modelos personalizados e envio para clientes." />
+        <Button onClick={onCreateTemplate}><Plus size={16} /> Novo template</Button>
+      </div>
+      <div className="email-stats">
+        <StatCard label="Recebidos" value={inboundCount} icon={<Mail />} />
+        <StatCard label="Nao lidos" value={unreadCount} icon={<Inbox />} accent="#f59e0b" />
+        <StatCard label="Enviados" value={sentCount} icon={<Send />} accent="#22c55e" />
+      </div>
+      <div className="email-layout">
+        <section className="panel email-inbox">
+          <header><h2>Caixa de entrada</h2><Badge color="#eff6ff">{data.emails.length} emails</Badge></header>
+          <div className="email-list">
+            {data.emails.map((email) => {
+              const contact = lookup.contacts[email.contactId]
+              return (
+                <button type="button" className={selectedEmail?.id === email.id ? 'email-item active' : 'email-item'} key={email.id} onClick={() => setSelectedEmailId(email.id)}>
+                  <div className="avatar">{initials(contact?.name || email.from)}</div>
+                  <div>
+                    <strong>{email.subject}</strong>
+                    <span>{contact?.name || email.from}</span>
+                    <small>{email.body}</small>
+                  </div>
+                  <Badge color={email.direction === 'inbound' ? '#dbeafe' : '#dcfce7'}>{email.direction === 'inbound' ? 'Recebido' : 'Enviado'}</Badge>
+                </button>
+              )
+            })}
+            {!data.emails.length ? <EmptyState icon={<Mail />} title="Nenhum email por enquanto" description="Emails recebidos e enviados aparecem aqui." /> : null}
+          </div>
+        </section>
+        <section className="panel email-reader">
+          {selectedEmail ? (
+            <>
+              <header>
+                <div>
+                  <span className="eyebrow">{selectedEmail.direction === 'inbound' ? 'Email recebido' : 'Email enviado'}</span>
+                  <h2>{selectedEmail.subject}</h2>
+                </div>
+                <Badge color={selectedEmail.status === 'unread' ? '#fef3c7' : '#dcfce7'}>{selectedEmail.status}</Badge>
+              </header>
+              <div className="email-addresses">
+                <span><strong>De</strong>{selectedEmail.from}</span>
+                <span><strong>Para</strong>{selectedEmail.to}</span>
+                <span><strong>Cliente</strong>{lookup.contacts[selectedEmail.contactId]?.name || 'Sem contato'}</span>
+                <span><strong>Data</strong>{formatDateTime(selectedEmail.createdAt)}</span>
+              </div>
+              <p className="email-body">{selectedEmail.body}</p>
+            </>
+          ) : (
+            <EmptyState icon={<Mail />} title="Selecione um email" description="Abra uma mensagem da lista para ver os detalhes." />
+          )}
+        </section>
+        <aside className="email-side">
+          <section className="panel email-composer">
+            <h2>Enviar template</h2>
+            <Field label="Template">
+              <Select value={selectedTemplate?.id || ''} onChange={(event) => setTemplateId(event.target.value)}>
+                {ownedTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Cliente">
+              <Select value={selectedContact?.id || ''} onChange={(event) => setContactId(event.target.value)}>
+                {data.contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.name}</option>)}
+              </Select>
+            </Field>
+            <div className="template-preview">
+              <strong>{selectedTemplate?.subject || 'Sem template selecionado'}</strong>
+              <p>{selectedTemplate?.body || 'Crie um template para comecar a enviar emails personalizados.'}</p>
+            </div>
+            <Button disabled={!selectedTemplate || !selectedContact} onClick={() => selectedTemplate && selectedContact && onSendTemplate(selectedTemplate, selectedContact)}><Send size={16} /> Enviar para cliente</Button>
+          </section>
+          <section className="panel email-templates">
+            <header><h2>Templates</h2><Badge color="#f1f5f9">{ownedTemplates.length}</Badge></header>
+            {ownedTemplates.map((template) => (
+              <article className="email-template-card" key={template.id}>
+                <strong>{template.name}</strong>
+                <span>{template.subject}</span>
+                <p>{template.body}</p>
+                <footer>
+                  <Button variant="secondary" onClick={() => onEditTemplate(template)}>Editar</Button>
+                  <Button variant="danger" onClick={() => onDeleteTemplate(template)}><Trash2 size={15} /></Button>
+                </footer>
+              </article>
+            ))}
+            {!ownedTemplates.length ? <EmptyState icon={<Mail />} title="Sem templates" description="Crie um modelo de email para este perfil." /> : null}
+          </section>
+        </aside>
+      </div>
+    </section>
+  )
+}
+
 function AppointmentsPage({ data, lookup, currentUser, onCreate, onCreateDoctor, onEdit, onDelete, onOpen }: { data: BootstrapData; lookup: Lookup; currentUser: User; onCreate: (seed?: FormState) => void; onCreateDoctor: () => void; onEdit: (item: Appointment) => void; onDelete: (item: Appointment) => void; onOpen: (item: Appointment) => void }) {
   const [view, setView] = useState<'mes' | 'semana' | 'lista'>('mes')
   const canManageDoctors = isAdmin(currentUser)
@@ -1297,6 +1453,7 @@ function FormModal({ mode, form, errors, data, saving, editing, onChange, onClos
         {mode === 'stage' ? <>{field('name', 'Nome da etapa', 'Ex: Prova')}{select('funnelId', 'Funil', data.funnels)}<Field label="Cor"><Select value={String(form.color ?? 'blue')} onChange={(event) => onChange('color', event.target.value)}>{Object.keys(stageColors).map((color) => <option key={color}>{color}</option>)}</Select></Field>{field('order', 'Ordem', '0', 'number')}</> : null}
         {mode === 'funnel' ? <>{field('name', 'Nome do funil', 'Ex: Comercial') }<Field label="Status"><Select value={String(form.status ?? 'active')} onChange={(event) => onChange('status', event.target.value)}><option>active</option><option>archived</option></Select></Field></> : null}
         {mode === 'campaign' ? <>{field('name', 'Nome', 'Ex: Campanha Cascavel')}{select('channelId', 'Canal', data.channels)}<Field label="Mensagem" error={errors.message}><TextArea value={String(form.message ?? '')} onChange={(event) => onChange('message', event.target.value)} /></Field><Field label="Grupo/lista"><Select value={String(form.groupId ?? '')} onChange={(event) => onChange('groupId', event.target.value)}><option value="">Todos</option>{data.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select></Field>{field('scheduledAt', 'Agendar data/hora', '', 'datetime-local')}<Field label="Status"><Select value={String(form.status ?? 'Rascunho')} onChange={(event) => onChange('status', event.target.value)}>{['Rascunho', 'Agendado', 'Em andamento', 'Completo', 'Pausado'].map((status) => <option key={status}>{status}</option>)}</Select></Field></> : null}
+        {mode === 'emailTemplate' ? <>{field('name', 'Nome do template', 'Ex: Pos-consulta cardiologia')}{field('subject', 'Assunto', 'Orientacoes para sua consulta')}<Field label="Mensagem" error={errors.body}><TextArea value={String(form.body ?? '')} onChange={(event) => onChange('body', event.target.value)} /></Field><p className="muted">Use {'{{nome}}'} para o cliente e {'{{medico}}'} para o profissional.</p></> : null}
         {mode === 'appointment' ? <>{field('title', 'Titulo', 'Ex: Consulta cardiologica')}<Field label="Tipo"><Select value={String(form.type ?? 'Consulta')} onChange={(event) => onChange('type', event.target.value)}>{['Consulta', 'Cirurgia', 'Reuniao', 'Retorno', 'Exame'].map((type) => <option key={type}>{type}</option>)}</Select></Field>{field('description', 'Descricao')}{field('date', 'Data', '', 'date')}{field('startTime', 'Hora inicial', '', 'time')}{field('endTime', 'Hora final', '', 'time')}{select('contactId', 'Paciente/contato', data.contacts)}{select('cardId', 'Lead/Card vinculado', data.cards.map((card) => ({ id: card.id, name: card.title })))}{select('departmentId', 'Setor clinico', data.departments)}{select('assignedUserId', 'Medico responsavel', doctors)}{field('room', 'Sala/consultorio', 'Consultorio 1')}<Field label="Status"><Select value={String(form.status ?? 'pendente')} onChange={(event) => onChange('status', event.target.value)}>{['pendente', 'confirmado', 'concluido', 'cancelado'].map((status) => <option key={status}>{status}</option>)}</Select></Field>{field('reminderMinutes', 'Lembrete (min)', '30', 'number')}<Field label="Observacoes"><TextArea value={String(form.notes ?? '')} onChange={(event) => onChange('notes', event.target.value)} /></Field></> : null}
         {mode === 'contact' ? <>{field('name', 'Nome')}{field('phone', 'Telefone')}{field('email', 'Email', '', 'email')}{select('channelId', 'Canal origem', data.channels)}{select('departmentId', 'Departamento', data.departments)}</> : null}
         {mode === 'department' ? <>{field('name', 'Nome')}{field('description', 'Descricao')}<Field label="Cor"><Select value={String(form.color ?? 'red')} onChange={(event) => onChange('color', event.target.value)}>{Object.keys(stageColors).map((color) => <option key={color}>{color}</option>)}</Select></Field></> : null}
@@ -1329,6 +1486,7 @@ function defaultForm(mode: FormMode, seed: object): FormState {
     stage: { name: '', funnelId: 'funnel_gravacao', color: 'blue', order: 0, ...safeSeed },
     funnel: { name: '', status: 'active', ...safeSeed },
     campaign: { name: '', channelId: 'channel_7', message: '', status: 'Rascunho', scheduledAt: '', ...safeSeed },
+    emailTemplate: { name: '', subject: '', body: 'Ola {{nome}}, segue a orientacao de {{medico}}.', ownerUserId: 'user_admin', ...safeSeed },
     appointment: { title: '', type: 'Consulta', description: '', date: '', startTime: '', endTime: '', contactId: '', cardId: '', departmentId: 'dep_consultorios', assignedUserId: '', room: '', status: 'pendente', reminderMinutes: 30, notes: '', ...safeSeed },
     contact: { name: '', phone: '', email: '', channelId: 'channel_1', departmentId: 'dep_recepcao', ...safeSeed },
     department: { name: '', description: '', color: 'red', ...safeSeed },
@@ -1349,12 +1507,12 @@ function normalizePayload(mode: FormMode, form: FormState) {
 }
 
 function resourceForMode(mode: FormMode) {
-  const map: Record<FormMode, string> = { card: 'cards', stage: 'stages', funnel: 'funnels', campaign: 'campaigns', appointment: 'appointments', contact: 'contacts', department: 'departments', user: 'users', group: 'groups', bot: 'bots', profile: 'settings', settings: 'settings' }
+  const map: Record<FormMode, string> = { card: 'cards', stage: 'stages', funnel: 'funnels', campaign: 'campaigns', emailTemplate: 'email-templates', appointment: 'appointments', contact: 'contacts', department: 'departments', user: 'users', group: 'groups', bot: 'bots', profile: 'settings', settings: 'settings' }
   return map[mode]
 }
 
 function labelForMode(mode: FormMode) {
-  const map: Record<FormMode, string> = { card: 'Card', stage: 'Etapa', funnel: 'Funil', campaign: 'Campanha', appointment: 'Agendamento', contact: 'Contato', department: 'Departamento', user: 'Usuario', group: 'Grupo', bot: 'Robo', profile: 'Perfil', settings: 'Configuracoes' }
+  const map: Record<FormMode, string> = { card: 'Card', stage: 'Etapa', funnel: 'Funil', campaign: 'Campanha', emailTemplate: 'Template de Email', appointment: 'Agendamento', contact: 'Contato', department: 'Departamento', user: 'Usuario', group: 'Grupo', bot: 'Robo', profile: 'Perfil', settings: 'Configuracoes' }
   return map[mode]
 }
 

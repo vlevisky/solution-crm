@@ -28,6 +28,8 @@ const collections = [
   'tags',
   'cards',
   'messages',
+  'emails',
+  'emailTemplates',
   'appointments',
   'campaigns',
   'campaignRecipients',
@@ -245,6 +247,85 @@ function seed() {
     createdAt,
     updatedAt: createdAt,
   }))
+  const emails = [
+    {
+      id: 'email_1',
+      workspaceId,
+      contactId: 'contact_1',
+      ownerUserId: 'user_cardio',
+      assignedUserId: 'user_cardio',
+      from: 'camila.andrade@email.com',
+      to: 'helena@clinicasolution.com',
+      subject: 'Duvida sobre preparo para consulta',
+      body: 'Dra. Helena, devo levar exames anteriores para a consulta cardiologica?',
+      direction: 'inbound',
+      status: 'unread',
+      createdAt: '2026-05-20T15:12:00.000Z',
+      updatedAt: '2026-05-20T15:12:00.000Z',
+    },
+    {
+      id: 'email_2',
+      workspaceId,
+      contactId: 'contact_4',
+      ownerUserId: 'user_ortopedia',
+      assignedUserId: 'user_ortopedia',
+      from: 'roberto.santana@email.com',
+      to: 'rafael@clinicasolution.com',
+      subject: 'Confirmacao da cirurgia',
+      body: 'Dr. Rafael, confirmo minha cirurgia e gostaria de receber novamente o checklist.',
+      direction: 'inbound',
+      status: 'unread',
+      createdAt: '2026-05-20T16:30:00.000Z',
+      updatedAt: '2026-05-20T16:30:00.000Z',
+    },
+    {
+      id: 'email_3',
+      workspaceId,
+      contactId: 'contact_3',
+      ownerUserId: 'user_cardio',
+      assignedUserId: 'user_cardio',
+      from: 'helena@clinicasolution.com',
+      to: 'marcia.fig@email.com',
+      subject: 'Orientacoes para exame',
+      body: 'Ola Marcia, seu exame esta confirmado. Leve documento com foto e chegue 20 minutos antes.',
+      direction: 'outbound',
+      status: 'sent',
+      createdAt: '2026-05-20T17:10:00.000Z',
+      updatedAt: '2026-05-20T17:10:00.000Z',
+    },
+  ]
+  const emailTemplates = [
+    {
+      id: 'template_1',
+      workspaceId,
+      ownerUserId: 'user_cardio',
+      name: 'Orientacoes cardiologia',
+      subject: 'Orientacoes para sua consulta',
+      body: 'Ola {{nome}}, sua consulta com {{medico}} esta confirmada. Traga exames anteriores e lista de medicamentos em uso.',
+      createdAt,
+      updatedAt: createdAt,
+    },
+    {
+      id: 'template_2',
+      workspaceId,
+      ownerUserId: 'user_ortopedia',
+      name: 'Checklist cirurgia',
+      subject: 'Checklist pre-operatorio',
+      body: 'Ola {{nome}}, seguem as orientacoes de {{medico}}: jejum de 8 horas, documentos, exames em maos e chegada com antecedencia.',
+      createdAt,
+      updatedAt: createdAt,
+    },
+    {
+      id: 'template_3',
+      workspaceId,
+      ownerUserId: 'user_admin',
+      name: 'Retorno administrativo',
+      subject: 'Retorno da Clinica Solution',
+      body: 'Ola {{nome}}, recebemos sua solicitacao e nossa equipe retornara em breve.',
+      createdAt,
+      updatedAt: createdAt,
+    },
+  ]
   return {
     workspaces: [{ id: workspaceId, name: 'Clinica Solution', email: 'contato@clinicasolution.com', phone: '+554999999999', createdAt, updatedAt: createdAt }],
     users,
@@ -256,6 +337,8 @@ function seed() {
     tags,
     cards,
     messages,
+    emails,
+    emailTemplates,
     appointments,
     campaigns,
     campaignRecipients: [],
@@ -304,7 +387,8 @@ async function readDb() {
   try {
     const raw = await fs.readFile(dbFile, 'utf8')
     const data = JSON.parse(raw)
-    for (const collection of collections) data[collection] ||= []
+    const defaults = seed()
+    for (const collection of collections) data[collection] ||= defaults[collection] || []
     return data
   } catch {
     const data = seed()
@@ -425,7 +509,7 @@ function crudRoutes(pathName, collection, { required = 'name', beforeCreate, bef
       const item = { ...payload, id: payload.id || id(collection.slice(0, -1)), workspaceId: payload.workspaceId || 'workspace_solution', createdAt: now(), updatedAt: now() }
       if (beforeCreate) beforeCreate(item, data)
       data[collection].push(item)
-      activity(data, 'created', collection, item.id, `${collection} criado: ${item.name || item.title}`)
+      activity(data, 'created', collection, item.id, `${collection} criado: ${item.name || item.title || item.subject || item.id}`)
       await writeDb(data)
       res.status(201).json(item)
     } catch (error) {
@@ -441,7 +525,7 @@ function crudRoutes(pathName, collection, { required = 'name', beforeCreate, bef
       if (required && payload[required] !== undefined) ensureName(payload, required)
       Object.assign(item, payload, { updatedAt: now() })
       if (beforeUpdate) beforeUpdate(item, data)
-      activity(data, 'updated', collection, item.id, `${collection} atualizado: ${item.name || item.title}`)
+      activity(data, 'updated', collection, item.id, `${collection} atualizado: ${item.name || item.title || item.subject || item.id}`)
       await writeDb(data)
       res.json(item)
     } catch (error) {
@@ -454,7 +538,7 @@ function crudRoutes(pathName, collection, { required = 'name', beforeCreate, bef
       const index = data[collection].findIndex((item) => item.id === req.params.id)
       if (index === -1) return res.status(404).json({ error: 'Registro nao encontrado' })
       const [removed] = data[collection].splice(index, 1)
-      activity(data, 'deleted', collection, removed.id, `${collection} excluido: ${removed.name || removed.title}`)
+      activity(data, 'deleted', collection, removed.id, `${collection} excluido: ${removed.name || removed.title || removed.subject || removed.id}`)
       await writeDb(data)
       res.json({ ok: true })
     } catch (error) {
@@ -515,6 +599,27 @@ crudRoutes('campaigns', 'campaigns', {
     item.readCount ||= 0
     item.repliedCount ||= 0
     item.failedCount ||= 0
+  },
+})
+crudRoutes('emails', 'emails', {
+  required: 'subject',
+  beforeCreate(item) {
+    item.direction ||= 'outbound'
+    item.status ||= item.direction === 'inbound' ? 'unread' : 'sent'
+    item.body ||= ''
+    item.from ||= ''
+    item.to ||= ''
+    item.ownerUserId ||= item.assignedUserId || 'user_admin'
+    item.assignedUserId ||= item.ownerUserId
+    item.contactId ||= ''
+  },
+})
+crudRoutes('email-templates', 'emailTemplates', {
+  required: 'name',
+  beforeCreate(item) {
+    item.ownerUserId ||= 'user_admin'
+    item.subject ||= item.name
+    item.body ||= ''
   },
 })
 crudRoutes('users', 'users')

@@ -123,6 +123,33 @@ export interface Message {
   createdAt: string
 }
 
+export interface EmailMessage {
+  id: EntityId
+  workspaceId: EntityId
+  contactId: EntityId
+  ownerUserId: EntityId
+  assignedUserId: EntityId
+  from: string
+  to: string
+  subject: string
+  body: string
+  direction: 'inbound' | 'outbound'
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EmailTemplate {
+  id: EntityId
+  workspaceId: EntityId
+  ownerUserId: EntityId
+  name: string
+  subject: string
+  body: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Appointment {
   id: EntityId
   workspaceId: EntityId
@@ -242,6 +269,8 @@ export interface BootstrapData {
   tags: Tag[]
   cards: CrmCard[]
   messages: Message[]
+  emails: EmailMessage[]
+  emailTemplates: EmailTemplate[]
   appointments: Appointment[]
   campaigns: Campaign[]
   groups: ContactGroup[]

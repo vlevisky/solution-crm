@@ -1457,6 +1457,140 @@ code {
   overflow: auto;
 }
 
+.email-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.email-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(420px, 1fr) minmax(300px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+
+.email-inbox,
+.email-reader,
+.email-side {
+  min-height: 560px;
+}
+
+.email-inbox header,
+.email-reader header,
+.email-templates header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.email-list,
+.email-templates {
+  display: grid;
+  gap: 10px;
+}
+
+.email-item {
+  width: 100%;
+  border: 1px solid #dbe5f1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: start;
+  text-align: left;
+  color: #0f172a;
+}
+
+.email-item.active {
+  border-color: var(--primary);
+  box-shadow: 0 10px 24px rgba(239, 90, 60, .12);
+}
+
+.email-item strong,
+.email-template-card strong {
+  display: block;
+}
+
+.email-item span,
+.email-template-card span,
+.email-addresses span {
+  color: #48607d;
+  font-size: 13px;
+}
+
+.email-item small {
+  color: #607694;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.email-addresses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.email-addresses span {
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.email-addresses strong {
+  display: block;
+  color: #0f172a;
+  margin-bottom: 3px;
+}
+
+.email-body {
+  border-top: 1px solid #dbe5f1;
+  padding-top: 18px;
+  color: #263b59;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.email-side {
+  display: grid;
+  gap: 16px;
+}
+
+.email-composer,
+.email-template-card {
+  display: grid;
+  gap: 12px;
+}
+
+.template-preview,
+.email-template-card {
+  border: 1px solid #dbe5f1;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.template-preview p,
+.email-template-card p {
+  color: #607694;
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.email-template-card footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -1475,8 +1609,13 @@ code {
   .stat-grid,
   .chart-grid,
   .stat-grid.reports,
-  .report-filters {
+  .report-filters,
+  .email-layout {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+  .email-side {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
   }
 }
 
@@ -1517,6 +1656,10 @@ code {
   .form-grid,
   .profile-details,
   .stat-grid,
+  .email-stats,
+  .email-layout,
+  .email-side,
+  .email-addresses,
   .chart-grid,
   .chart-grid.wide,
   .stat-grid.reports,
@@ -1560,7 +1703,11 @@ code {
 .app-shell[data-theme="dark"] .bubble,
 .app-shell[data-theme="dark"] .month-switcher,
 .app-shell[data-theme="dark"] .settings-summary span,
-.app-shell[data-theme="dark"] .profile-details div {
+.app-shell[data-theme="dark"] .profile-details div,
+.app-shell[data-theme="dark"] .email-item,
+.app-shell[data-theme="dark"] .email-addresses span,
+.app-shell[data-theme="dark"] .template-preview,
+.app-shell[data-theme="dark"] .email-template-card {
   background-color: var(--surface);
   color: var(--text);
   border-color: var(--line);
@@ -1598,9 +1745,20 @@ code {
   color: var(--muted);
 }
 
+.app-shell[data-theme="dark"] .email-item span,
+.app-shell[data-theme="dark"] .email-item small,
+.app-shell[data-theme="dark"] .email-template-card span,
+.app-shell[data-theme="dark"] .email-template-card p,
+.app-shell[data-theme="dark"] .template-preview p,
+.app-shell[data-theme="dark"] .email-body,
+.app-shell[data-theme="dark"] .email-addresses span {
+  color: var(--muted);
+}
+
 .app-shell[data-theme="dark"] .field,
 .app-shell[data-theme="dark"] .settings-summary strong,
 .app-shell[data-theme="dark"] .profile-details strong,
+.app-shell[data-theme="dark"] .email-addresses strong,
 .app-shell[data-theme="dark"] .empty-state h3,
 .app-shell[data-theme="dark"] .link-button,
 .app-shell[data-theme="dark"] .bot-options summary,

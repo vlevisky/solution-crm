@@ -1030,5 +1030,84 @@
       "createdAt": "2026-05-20T12:00:00.000Z",
       "updatedAt": "2026-05-20T12:00:00.000Z"
     }
+  ],
+  "emails": [
+    {
+      "id": "email_1",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_1",
+      "ownerUserId": "user_cardio",
+      "assignedUserId": "user_cardio",
+      "from": "camila.andrade@email.com",
+      "to": "helena@clinicasolution.com",
+      "subject": "Duvida sobre preparo para consulta",
+      "body": "Dra. Helena, devo levar exames anteriores para a consulta cardiologica?",
+      "direction": "inbound",
+      "status": "unread",
+      "createdAt": "2026-05-20T15:12:00.000Z",
+      "updatedAt": "2026-05-20T15:12:00.000Z"
+    },
+    {
+      "id": "email_2",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_4",
+      "ownerUserId": "user_ortopedia",
+      "assignedUserId": "user_ortopedia",
+      "from": "roberto.santana@email.com",
+      "to": "rafael@clinicasolution.com",
+      "subject": "Confirmacao da cirurgia",
+      "body": "Dr. Rafael, confirmo minha cirurgia e gostaria de receber novamente o checklist.",
+      "direction": "inbound",
+      "status": "unread",
+      "createdAt": "2026-05-20T16:30:00.000Z",
+      "updatedAt": "2026-05-20T16:30:00.000Z"
+    },
+    {
+      "id": "email_3",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_3",
+      "ownerUserId": "user_cardio",
+      "assignedUserId": "user_cardio",
+      "from": "helena@clinicasolution.com",
+      "to": "marcia.fig@email.com",
+      "subject": "Orientacoes para exame",
+      "body": "Ola Marcia, seu exame esta confirmado. Leve documento com foto e chegue 20 minutos antes.",
+      "direction": "outbound",
+      "status": "sent",
+      "createdAt": "2026-05-20T17:10:00.000Z",
+      "updatedAt": "2026-05-20T17:10:00.000Z"
+    }
+  ],
+  "emailTemplates": [
+    {
+      "id": "template_1",
+      "workspaceId": "workspace_solution",
+      "ownerUserId": "user_cardio",
+      "name": "Orientacoes cardiologia",
+      "subject": "Orientacoes para sua consulta",
+      "body": "Ola {{nome}}, sua consulta com {{medico}} esta confirmada. Traga exames anteriores e lista de medicamentos em uso.",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "template_2",
+      "workspaceId": "workspace_solution",
+      "ownerUserId": "user_ortopedia",
+      "name": "Checklist cirurgia",
+      "subject": "Checklist pre-operatorio",
+      "body": "Ola {{nome}}, seguem as orientacoes de {{medico}}: jejum de 8 horas, documentos, exames em maos e chegada com antecedencia.",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "template_3",
+      "workspaceId": "workspace_solution",
+      "ownerUserId": "user_admin",
+      "name": "Retorno administrativo",
+      "subject": "Retorno da Clinica Solution",
+      "body": "Ola {{nome}}, recebemos sua solicitacao e nossa equipe retornara em breve.",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
   ]
 }
