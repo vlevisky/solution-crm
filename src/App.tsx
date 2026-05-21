@@ -141,6 +141,58 @@ const pageTitles: Record<Page, string> = {
   perfil: 'Meu Perfil',
 }
 
+function cleanMessageBody(body = '') {
+  return body.replace(/\\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+function messagePreview(body = '') {
+  return cleanMessageBody(body).replace(/\s+/g, ' ')
+}
+
+function parseBotOptions(body: string) {
+  const lines = cleanMessageBody(body).split('\n').map((line) => line.trim()).filter(Boolean)
+  const options = lines
+    .map((line) => line.match(/^(\d+)\s*[-.)]\s*(.+)$/))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .map((match) => ({ value: match[1], label: match[2] }))
+  const intro = lines.filter((line) => !/^(\d+)\s*[-.)]\s*(.+)$/.test(line)).join(' ')
+  return { intro, options }
+}
+
+function MessageBody({ body, compact = false }: { body: string; compact?: boolean }) {
+  const { intro, options } = parseBotOptions(body)
+  if (!options.length) {
+    return <p className="message-text">{cleanMessageBody(body)}</p>
+  }
+  return (
+    <div className={compact ? 'bot-message compact' : 'bot-message'}>
+      {intro ? <p>{intro}</p> : null}
+      <details open={!compact} className="bot-options">
+        <summary>{options.length} opcoes disponiveis</summary>
+        <div>
+          {options.map((option) => (
+            <button type="button" key={`${option.value}-${option.label}`}>
+              <strong>{option.value}</strong>
+              <span>{option.label}</span>
+            </button>
+          ))}
+        </div>
+      </details>
+    </div>
+  )
+}
+
+function monthLabel(month: string) {
+  const [year, monthNumber] = month.split('-').map(Number)
+  return new Date(year, monthNumber - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+}
+
+function monthDays(month: string) {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const total = new Date(year, monthNumber, 0).getDate()
+  return Array.from({ length: total }, (_, index) => `${year}-${String(monthNumber).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`)
+}
+
 function App() {
   return (
     <ToastProvider>
@@ -234,7 +286,7 @@ function SolutionCrm() {
       stage: ['name', 'funnelId'],
       funnel: ['name'],
       campaign: ['name', 'message'],
-      appointment: ['title', 'date', 'startTime', 'endTime'],
+      appointment: ['title', 'date', 'startTime', 'endTime', 'assignedUserId'],
       contact: ['name', 'phone'],
       department: ['name'],
       user: ['name', 'email'],
@@ -417,7 +469,7 @@ function SolutionCrm() {
           <AppointmentsPage
             data={data}
             lookup={lookup}
-            onCreate={(date) => openCreate('appointment', date ? { date } : {})}
+            onCreate={(seed) => openCreate('appointment', seed || {})}
             onCreateDoctor={() => openCreate('user', { role: 'medico', title: 'Medico(a)', departmentId: 'dep_consultorios' })}
             onEdit={(appointment) => openEdit('appointment', appointment)}
             onDelete={(appointment) => setConfirm({ resource: 'appointments', id: appointment.id, title: 'Excluir agendamento', description: `Deseja excluir ${appointment.title}?` })}
@@ -556,7 +608,7 @@ function AttendancePage(props: {
               <div className="avatar">{initials(contact.name)}</div>
               <div>
                 <strong>{contact.name || contact.phone}</strong>
-                <span>{data.messages.find((message) => message.contactId === contact.id)?.body || 'Sem mensagens'}</span>
+                <span>{messagePreview(data.messages.find((message) => message.contactId === contact.id)?.body || 'Sem mensagens')}</span>
                 <small>{lookup.departments[contact.departmentId]?.name} - {lookup.channels[contact.channelId]?.name}</small>
               </div>
               <aside><small>20:{20 + index}</small><Badge color="#dcfce7">{index + 1}</Badge></aside>
@@ -578,7 +630,7 @@ function AttendancePage(props: {
             <div className="messages">
               {props.messages.map((message) => (
                 <div className={message.direction === 'outbound' ? 'bubble outbound' : 'bubble'} key={message.id}>
-                  <p>{message.body}</p>
+                  <MessageBody body={message.body} />
                   <small>{formatDateTime(message.createdAt)}</small>
                 </div>
               ))}
@@ -601,7 +653,7 @@ function AttendancePage(props: {
             <p>{props.selectedContact.email}</p>
             <Badge color="#fee2e2">{lookup.departments[props.selectedContact.departmentId]?.name}</Badge>
             <h4>Historico</h4>
-            {props.messages.slice(-4).map((message) => <p className="history-line" key={message.id}>{message.body}</p>)}
+            {props.messages.slice(-4).map((message) => <div className="history-line" key={message.id}><MessageBody body={message.body} compact /></div>)}
             <h4>Cards vinculados</h4>
             <p>{props.selectedCard?.title || 'Nenhum card vinculado'}</p>
           </>
@@ -807,22 +859,33 @@ function CampaignsPage({ data, search, setSearch, statusFilter, setStatusFilter,
   )
 }
 
-function AppointmentsPage({ data, lookup, onCreate, onCreateDoctor, onEdit, onDelete, onOpen }: { data: BootstrapData; lookup: Lookup; onCreate: (date?: string) => void; onCreateDoctor: () => void; onEdit: (item: Appointment) => void; onDelete: (item: Appointment) => void; onOpen: (item: Appointment) => void }) {
+function AppointmentsPage({ data, lookup, onCreate, onCreateDoctor, onEdit, onDelete, onOpen }: { data: BootstrapData; lookup: Lookup; onCreate: (seed?: FormState) => void; onCreateDoctor: () => void; onEdit: (item: Appointment) => void; onDelete: (item: Appointment) => void; onOpen: (item: Appointment) => void }) {
   const [view, setView] = useState<'mes' | 'semana' | 'lista'>('mes')
   const [doctorFilter, setDoctorFilter] = useState('Todos')
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const nextAppointment = data.appointments.map((item) => item.date).sort()[0]
+    return (nextAppointment || new Date().toISOString().slice(0, 10)).slice(0, 7)
+  })
   const doctors = data.users.filter((user) => user.role === 'medico' || user.title.toLowerCase().includes('medic') || user.title.toLowerCase().includes('médic'))
   const appointments = data.appointments.filter((appointment) => doctorFilter === 'Todos' || appointment.assignedUserId === doctorFilter)
+  const visibleAppointments = appointments.filter((appointment) => view === 'lista' || appointment.date.startsWith(selectedMonth))
+  const defaultDoctorId = doctorFilter !== 'Todos' ? doctorFilter : doctors[0]?.id || ''
   const typeColors: Record<string, string> = { Consulta: '#e0f2fe', Cirurgia: '#fee2e2', Reuniao: '#ede9fe', Retorno: '#dcfce7', Exame: '#fef3c7' }
-  const surgicalToday = appointments.filter((item) => item.type === 'Cirurgia').length
-  const confirmed = appointments.filter((item) => item.status === 'confirmado').length
-  const days = Array.from({ length: 30 }, (_, index) => `2026-05-${String(index + 1).padStart(2, '0')}`)
+  const surgicalToday = visibleAppointments.filter((item) => item.type === 'Cirurgia').length
+  const confirmed = visibleAppointments.filter((item) => item.status === 'confirmado').length
+  const days = monthDays(selectedMonth)
+  const shiftMonth = (amount: number) => {
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const next = new Date(year, month - 1 + amount, 1)
+    setSelectedMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`)
+  }
   return (
     <section className="page-flow">
       <div className="page-head">
         <PageIntro title="Agenda medica" subtitle="Controle consultas, cirurgias, exames, retornos e reunioes por medico." />
         <div className="top-actions">
           <Button variant="secondary" onClick={onCreateDoctor}><UserPlus size={16} /> Novo medico</Button>
-          <Button onClick={() => onCreate()}><Plus size={16} /> Novo Agendamento</Button>
+          <Button onClick={() => onCreate({ assignedUserId: defaultDoctorId })}><Plus size={16} /> Novo Agendamento</Button>
         </div>
       </div>
       <section className="clinic-command panel">
@@ -838,13 +901,18 @@ function AppointmentsPage({ data, lookup, onCreate, onCreateDoctor, onEdit, onDe
       <div className="filters-line panel">
         <div className="segmented wide">{['mes', 'semana', 'lista'].map((item) => <button className={view === item ? 'active' : ''} key={item} onClick={() => setView(item as 'mes')}>{item}</button>)}</div>
         <Field label="Medico"><Select value={doctorFilter} onChange={(event) => setDoctorFilter(event.target.value)}><option>Todos</option>{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name} - {doctor.specialty || doctor.title}</option>)}</Select></Field>
+        <div className="month-switcher">
+          <IconButton aria-label="Mes anterior" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></IconButton>
+          <strong>{monthLabel(selectedMonth)}</strong>
+          <IconButton aria-label="Proximo mes" onClick={() => shiftMonth(1)}><ChevronRight size={16} /></IconButton>
+        </div>
         <div className="tag-row">{Object.entries(typeColors).map(([type, color]) => <Badge key={type} color={color}>{type}</Badge>)}</div>
       </div>
       {view !== 'lista' ? (
         <div className="calendar-grid">
           {days.map((day) => {
             const items = appointments.filter((appointment) => appointment.date === day)
-            return <button className="calendar-day" key={day} onClick={() => onCreate(day)}><strong>{Number(day.slice(-2))}</strong>{items.map((item) => <span className={`appt-type ${String(item.type || 'Consulta').toLowerCase()}`} key={item.id} onClick={(event) => { event.stopPropagation(); onOpen(item) }}>{item.title}<small>{lookup.users[item.assignedUserId]?.name || 'Medico'} - {item.startTime}</small></span>)}</button>
+            return <button className="calendar-day" key={day} onClick={() => onCreate({ date: day, assignedUserId: defaultDoctorId })}><strong>{Number(day.slice(-2))}</strong>{items.map((item) => <span className={`appt-type ${String(item.type || 'Consulta').toLowerCase()}`} key={item.id} onClick={(event) => { event.stopPropagation(); onOpen(item) }}>{item.title}<small>{lookup.users[item.assignedUserId]?.name || 'Medico'} - {item.startTime}</small></span>)}</button>
           })}
         </div>
       ) : (
@@ -926,13 +994,25 @@ function SettingsPage({ data, onEdit }: { data: BootstrapData; onEdit: () => voi
   const settings = data.settings[0]
   return (
     <section className="page-flow">
-      <div className="page-head"><PageIntro title="Configuracoes" subtitle="Conta, tema, canais, integracoes e webhooks." /><Button onClick={onEdit}><Settings size={16} /> Editar conta e tema</Button></div>
+      <div className="page-head"><PageIntro title="Configuracoes" subtitle="Conta, tema, canais, integracoes e webhooks." /><Button onClick={onEdit}><Settings size={16} /> Editar configuracoes</Button></div>
+      <section className="settings-hero panel">
+        <div>
+          <span className="eyebrow">Workspace</span>
+          <h2>{settings.companyName}</h2>
+          <p className="muted">{settings.email} - {settings.phone}</p>
+        </div>
+        <div className="settings-summary">
+          <span><strong>{settings.theme === 'dark' ? 'Escuro' : 'Claro'}</strong>Tema</span>
+          <span><strong>{settings.density === 'compact' ? 'Compacta' : 'Confortavel'}</strong>Densidade</span>
+          <span><strong>{settings.language}</strong>Idioma</span>
+        </div>
+      </section>
       <div className="settings-grid">
-        <section className="panel"><h2>Conta</h2><p>{settings.companyName}</p><p>{settings.email}</p><p>{settings.timezone} - {settings.language}</p></section>
-        <section className="panel"><h2>Aparencia</h2><div className="theme-preview"><span style={{ background: settings.primaryColor }} /><strong>{settings.theme === 'dark' ? 'Tema escuro' : 'Tema claro'}</strong><p>{settings.density === 'compact' ? 'Densidade compacta' : 'Densidade confortavel'}</p></div></section>
-        <section className="panel"><h2>Canais</h2>{data.channels.map((channel) => <Badge key={channel.id} color="#eff6ff">{channel.name} - {channel.status}</Badge>)}</section>
-        <section className="panel"><h2>Integracoes</h2>{Object.entries(settings.integrations).map(([key, value]) => <div className="list-row" key={key}><strong>{key}</strong><Badge color="#fef3c7">{value.status}</Badge><span>{value.tokenMasked || value.url}</span></div>)}</section>
-        <section className="panel"><h2>Webhook</h2><code>POST /api/webhooks/inbound-message</code></section>
+        <section className="panel settings-card"><h2>Aparencia</h2><div className="theme-preview"><span style={{ background: settings.primaryColor }} /><div><strong>{settings.theme === 'dark' ? 'Tema escuro' : 'Tema claro'}</strong><p>{settings.density === 'compact' ? 'Densidade compacta' : 'Densidade confortavel'}</p></div></div></section>
+        <section className="panel settings-card"><h2>Localizacao</h2><p>{settings.timezone}</p><p>{settings.language}</p></section>
+        <section className="panel settings-card"><h2>Canais</h2><div className="tag-row">{data.channels.map((channel) => <Badge key={channel.id} color="#eff6ff">{channel.name} - {channel.status}</Badge>)}</div></section>
+        <section className="panel settings-card wide"><h2>Integracoes</h2>{Object.entries(settings.integrations).map(([key, value]) => <div className="list-row" key={key}><strong>{key}</strong><Badge color="#fef3c7">{value.status}</Badge><span>{value.tokenMasked || value.url}</span></div>)}</section>
+        <section className="panel settings-card"><h2>Webhook</h2><code>POST /api/webhooks/inbound-message</code></section>
       </div>
     </section>
   )
@@ -960,11 +1040,16 @@ function ProfilePage({ data, onBack, onEdit }: { data: BootstrapData; onBack: ()
       </aside>
       <main className="profile-main">
         <section className="panel">
-          <div className="page-head"><PageIntro title="Dados Pessoais" subtitle="Gerencie suas informacoes basicas de identificacao." /><Button onClick={onEdit}>Salvar Alteracoes</Button></div>
-          <div className="form-grid"><Field label="Nome"><Input value={profile.name} readOnly /></Field><Field label="Email comercial"><Input value={profile.email} readOnly /></Field><Field label="WhatsApp"><Input value={profile.whatsapp} readOnly /></Field><Field label="Cargo (opcional)"><Input value={profile.title} readOnly /></Field></div>
+          <div className="page-head"><PageIntro title="Dados Pessoais" subtitle="Gerencie suas informacoes basicas de identificacao." /><Button onClick={onEdit}>Editar dados</Button></div>
+          <div className="profile-details">
+            <div><span>Nome</span><strong>{profile.name}</strong></div>
+            <div><span>Email comercial</span><strong>{profile.email}</strong></div>
+            <div><span>WhatsApp</span><strong>{profile.whatsapp}</strong></div>
+            <div><span>Cargo</span><strong>{profile.title || 'Nao informado'}</strong></div>
+          </div>
         </section>
         <section className="panel"><PageIntro title="Seguranca" subtitle="Atualize sua senha de acesso." /><div className="form-grid"><Field label="Senha Atual"><Input type="password" placeholder="Insira sua senha atual" /></Field><Field label="Nova Senha"><Input type="password" placeholder="Minimo 8 caracteres" /></Field><Field label="Confirmar Nova Senha"><Input type="password" placeholder="Repita a nova senha" /></Field></div><Button>Alterar Senha</Button></section>
-        <section className="panel"><PageIntro title="Aparencia" subtitle="O tema real fica em Configuracoes e muda todo o sistema." /><div className="form-grid"><Field label="Tema"><Input value={data.settings[0].theme === 'dark' ? 'Escuro' : 'Claro'} readOnly /></Field><Field label="Cor principal"><Input type="color" defaultValue={data.settings[0].primaryColor} /></Field><Field label="Densidade"><Input value={data.settings[0].density} readOnly /></Field></div></section>
+        <section className="panel"><PageIntro title="Aparencia" subtitle="O tema real fica em Configuracoes e muda todo o sistema." /><div className="profile-details"><div><span>Tema</span><strong>{data.settings[0].theme === 'dark' ? 'Escuro' : 'Claro'}</strong></div><div><span>Cor principal</span><strong>{data.settings[0].primaryColor}</strong></div><div><span>Densidade</span><strong>{data.settings[0].density === 'compact' ? 'Compacta' : 'Confortavel'}</strong></div></div></section>
       </main>
     </section>
   )
@@ -1005,6 +1090,7 @@ function FormModal({ mode, form, errors, data, saving, editing, onChange, onClos
   const title = `${editing ? 'Editar' : 'Novo'} ${labelForMode(mode)}`
   const field = (name: string, label: string, placeholder = '', type = 'text') => <Field label={label} error={errors[name]}><Input type={type} value={String(form[name] ?? '')} placeholder={placeholder} onChange={(event) => onChange(name, event.target.value)} /></Field>
   const select = (name: string, label: string, options: Array<{ id: string; name: string }>) => <Field label={label} error={errors[name]}><Select value={String(form[name] ?? '')} onChange={(event) => onChange(name, event.target.value)}><option value="">Selecione</option>{options.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}</Select></Field>
+  const doctors = data.users.filter((user) => user.role === 'medico' || user.title.toLowerCase().includes('medic') || user.title.toLowerCase().includes('médic') || user.title.toLowerCase().includes('mÃ©dic'))
   return (
     <Modal title={title} open onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button loading={saving} onClick={onSubmit}>Salvar</Button></>}>
       <div className="form-grid">
@@ -1012,7 +1098,7 @@ function FormModal({ mode, form, errors, data, saving, editing, onChange, onClos
         {mode === 'stage' ? <>{field('name', 'Nome da etapa', 'Ex: Prova')}{select('funnelId', 'Funil', data.funnels)}<Field label="Cor"><Select value={String(form.color ?? 'blue')} onChange={(event) => onChange('color', event.target.value)}>{Object.keys(stageColors).map((color) => <option key={color}>{color}</option>)}</Select></Field>{field('order', 'Ordem', '0', 'number')}</> : null}
         {mode === 'funnel' ? <>{field('name', 'Nome do funil', 'Ex: Comercial') }<Field label="Status"><Select value={String(form.status ?? 'active')} onChange={(event) => onChange('status', event.target.value)}><option>active</option><option>archived</option></Select></Field></> : null}
         {mode === 'campaign' ? <>{field('name', 'Nome', 'Ex: Campanha Cascavel')}{select('channelId', 'Canal', data.channels)}<Field label="Mensagem" error={errors.message}><TextArea value={String(form.message ?? '')} onChange={(event) => onChange('message', event.target.value)} /></Field><Field label="Grupo/lista"><Select value={String(form.groupId ?? '')} onChange={(event) => onChange('groupId', event.target.value)}><option value="">Todos</option>{data.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select></Field>{field('scheduledAt', 'Agendar data/hora', '', 'datetime-local')}<Field label="Status"><Select value={String(form.status ?? 'Rascunho')} onChange={(event) => onChange('status', event.target.value)}>{['Rascunho', 'Agendado', 'Em andamento', 'Completo', 'Pausado'].map((status) => <option key={status}>{status}</option>)}</Select></Field></> : null}
-        {mode === 'appointment' ? <>{field('title', 'Titulo', 'Ex: Consulta cardiologica')}<Field label="Tipo"><Select value={String(form.type ?? 'Consulta')} onChange={(event) => onChange('type', event.target.value)}>{['Consulta', 'Cirurgia', 'Reuniao', 'Retorno', 'Exame'].map((type) => <option key={type}>{type}</option>)}</Select></Field>{field('description', 'Descricao')}{field('date', 'Data', '', 'date')}{field('startTime', 'Hora inicial', '', 'time')}{field('endTime', 'Hora final', '', 'time')}{select('contactId', 'Paciente/contato', data.contacts)}{select('cardId', 'Lead/Card vinculado', data.cards.map((card) => ({ id: card.id, name: card.title })))}{select('departmentId', 'Setor clinico', data.departments)}{select('assignedUserId', 'Medico responsavel', data.users)}{field('room', 'Sala/consultorio', 'Consultorio 1')}<Field label="Status"><Select value={String(form.status ?? 'pendente')} onChange={(event) => onChange('status', event.target.value)}>{['pendente', 'confirmado', 'concluido', 'cancelado'].map((status) => <option key={status}>{status}</option>)}</Select></Field>{field('reminderMinutes', 'Lembrete (min)', '30', 'number')}<Field label="Observacoes"><TextArea value={String(form.notes ?? '')} onChange={(event) => onChange('notes', event.target.value)} /></Field></> : null}
+        {mode === 'appointment' ? <>{field('title', 'Titulo', 'Ex: Consulta cardiologica')}<Field label="Tipo"><Select value={String(form.type ?? 'Consulta')} onChange={(event) => onChange('type', event.target.value)}>{['Consulta', 'Cirurgia', 'Reuniao', 'Retorno', 'Exame'].map((type) => <option key={type}>{type}</option>)}</Select></Field>{field('description', 'Descricao')}{field('date', 'Data', '', 'date')}{field('startTime', 'Hora inicial', '', 'time')}{field('endTime', 'Hora final', '', 'time')}{select('contactId', 'Paciente/contato', data.contacts)}{select('cardId', 'Lead/Card vinculado', data.cards.map((card) => ({ id: card.id, name: card.title })))}{select('departmentId', 'Setor clinico', data.departments)}{select('assignedUserId', 'Medico responsavel', doctors)}{field('room', 'Sala/consultorio', 'Consultorio 1')}<Field label="Status"><Select value={String(form.status ?? 'pendente')} onChange={(event) => onChange('status', event.target.value)}>{['pendente', 'confirmado', 'concluido', 'cancelado'].map((status) => <option key={status}>{status}</option>)}</Select></Field>{field('reminderMinutes', 'Lembrete (min)', '30', 'number')}<Field label="Observacoes"><TextArea value={String(form.notes ?? '')} onChange={(event) => onChange('notes', event.target.value)} /></Field></> : null}
         {mode === 'contact' ? <>{field('name', 'Nome')}{field('phone', 'Telefone')}{field('email', 'Email', '', 'email')}{select('channelId', 'Canal origem', data.channels)}{select('departmentId', 'Departamento', data.departments)}</> : null}
         {mode === 'department' ? <>{field('name', 'Nome')}{field('description', 'Descricao')}<Field label="Cor"><Select value={String(form.color ?? 'red')} onChange={(event) => onChange('color', event.target.value)}>{Object.keys(stageColors).map((color) => <option key={color}>{color}</option>)}</Select></Field></> : null}
         {mode === 'user' ? <>{field('name', 'Nome')}{field('email', 'Email', '', 'email')}{field('title', 'Cargo')}{field('specialty', 'Especialidade medica', 'Cardiologia')}{field('crm', 'CRM/registro', 'CRM-SP 000000')}{select('departmentId', 'Departamento', data.departments)}<Field label="Papel/permissao"><Select value={String(form.role ?? 'atendente')} onChange={(event) => onChange('role', event.target.value)}><option>administrador</option><option>supervisor</option><option>medico</option><option>atendente</option></Select></Field><Field label="Status"><Select value={String(form.status ?? 'active')} onChange={(event) => onChange('status', event.target.value)}><option>active</option><option>inactive</option></Select></Field></> : null}
@@ -1031,7 +1117,7 @@ function EntityDrawer({ drawer, data, lookup, onClose, onEdit }: { drawer: { typ
   const appointment = drawer.type === 'appointment' ? data.appointments.find((item) => item.id === drawer.id) : undefined
   return (
     <Drawer title="Detalhes" open onClose={onClose}>
-      {contact ? <div className="drawer-section"><div className="avatar big">{initials(contact.name)}</div><h2>{contact.name}</h2><p>{contact.phone}</p><p>{contact.email}</p><Badge color="#eff6ff">{lookup.channels[contact.channelId]?.name}</Badge><h3>Historico</h3>{data.messages.filter((message) => message.contactId === contact.id).map((message) => <p className="history-line" key={message.id}>{message.body}</p>)}<Button onClick={() => onEdit('contact', contact)}>Editar contato</Button></div> : null}
+      {contact ? <div className="drawer-section"><div className="avatar big">{initials(contact.name)}</div><h2>{contact.name}</h2><p>{contact.phone}</p><p>{contact.email}</p><Badge color="#eff6ff">{lookup.channels[contact.channelId]?.name}</Badge><h3>Historico</h3>{data.messages.filter((message) => message.contactId === contact.id).map((message) => <div className="history-line" key={message.id}><MessageBody body={message.body} compact /></div>)}<Button onClick={() => onEdit('contact', contact)}>Editar contato</Button></div> : null}
       {appointment ? <div className="drawer-section"><h2>{appointment.title}</h2><p>{appointment.description}</p><Badge color="#fef3c7">{appointment.status}</Badge><p>{appointment.date} {appointment.startTime} - {appointment.endTime}</p><p>{lookup.contacts[appointment.contactId]?.name}</p><Button onClick={() => onEdit('appointment', appointment)}>Editar agendamento</Button></div> : null}
     </Drawer>
   )
@@ -1044,7 +1130,7 @@ function defaultForm(mode: FormMode, seed: object): FormState {
     stage: { name: '', funnelId: 'funnel_gravacao', color: 'blue', order: 0, ...safeSeed },
     funnel: { name: '', status: 'active', ...safeSeed },
     campaign: { name: '', channelId: 'channel_7', message: '', status: 'Rascunho', scheduledAt: '', ...safeSeed },
-    appointment: { title: '', type: 'Consulta', description: '', date: '', startTime: '', endTime: '', contactId: '', cardId: '', departmentId: 'dep_consultorios', assignedUserId: 'user_admin', room: '', status: 'pendente', reminderMinutes: 30, notes: '', ...safeSeed },
+    appointment: { title: '', type: 'Consulta', description: '', date: '', startTime: '', endTime: '', contactId: '', cardId: '', departmentId: 'dep_consultorios', assignedUserId: '', room: '', status: 'pendente', reminderMinutes: 30, notes: '', ...safeSeed },
     contact: { name: '', phone: '', email: '', channelId: 'channel_1', departmentId: 'dep_recepcao', ...safeSeed },
     department: { name: '', description: '', color: 'red', ...safeSeed },
     user: { name: '', email: '', title: '', specialty: '', crm: '', departmentId: 'dep_consultorios', role: 'atendente', status: 'active', ...safeSeed },
