@@ -1,0 +1,1034 @@
+{
+  "workspaces": [
+    {
+      "id": "workspace_solution",
+      "name": "Clinica Solution",
+      "email": "contato@clinicasolution.com",
+      "phone": "+554999999999",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "user_admin",
+      "workspaceId": "workspace_solution",
+      "name": "Dra. Marina Costa",
+      "email": "marina@clinicasolution.com",
+      "role": "administrador",
+      "title": "Diretora Clinica",
+      "departmentId": "dep_consultorios",
+      "status": "active",
+      "avatarUrl": "",
+      "specialty": "Clínica Geral",
+      "crm": "CRM-SP 184221",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "user_ortopedia",
+      "workspaceId": "workspace_solution",
+      "name": "Dr. Rafael Nunes",
+      "email": "rafael@clinicasolution.com",
+      "role": "medico",
+      "title": "Medico Ortopedista",
+      "departmentId": "dep_cirurgico",
+      "status": "active",
+      "avatarUrl": "",
+      "specialty": "Ortopedia",
+      "crm": "CRM-SP 221450",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "user_cardio",
+      "workspaceId": "workspace_solution",
+      "name": "Dra. Helena Martins",
+      "email": "helena@clinicasolution.com",
+      "role": "medico",
+      "title": "Medica Cardiologista",
+      "departmentId": "dep_exames",
+      "status": "active",
+      "avatarUrl": "",
+      "specialty": "Cardiologia",
+      "crm": "CRM-SP 198773",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "user_recepcao",
+      "workspaceId": "workspace_solution",
+      "name": "Ana Recepcao",
+      "email": "recepcao@clinicasolution.com",
+      "role": "atendente",
+      "title": "Recepcao",
+      "departmentId": "dep_recepcao",
+      "status": "active",
+      "avatarUrl": "",
+      "specialty": "",
+      "crm": "",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "departments": [
+    {
+      "id": "dep_recepcao",
+      "workspaceId": "workspace_solution",
+      "name": "Recepcao",
+      "color": "blue",
+      "description": "Entrada de pacientes, check-in e autorizacoes",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "dep_triagem",
+      "workspaceId": "workspace_solution",
+      "name": "Triagem",
+      "color": "green",
+      "description": "Classificacao inicial e sinais vitais",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "dep_consultorios",
+      "workspaceId": "workspace_solution",
+      "name": "Consultorios",
+      "color": "purple",
+      "description": "Consultas medicas e retornos",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "dep_cirurgico",
+      "workspaceId": "workspace_solution",
+      "name": "Centro Cirurgico",
+      "color": "red",
+      "description": "Procedimentos, cirurgias e pre-operatorio",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "dep_exames",
+      "workspaceId": "workspace_solution",
+      "name": "Exames e Diagnostico",
+      "color": "orange",
+      "description": "Exames, laudos e preparos",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "dep_financeiro",
+      "workspaceId": "workspace_solution",
+      "name": "Financeiro",
+      "color": "gray",
+      "description": "Guias, recebimentos e repasses",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "channels": [
+    {
+      "id": "channel_1",
+      "workspaceId": "workspace_solution",
+      "name": "Robo WhatsApp",
+      "type": "whatsapp",
+      "status": "Simulado",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "channel_2",
+      "workspaceId": "workspace_solution",
+      "name": "WhatsApp",
+      "type": "whatsapp",
+      "status": "Simulado",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "channel_3",
+      "workspaceId": "workspace_solution",
+      "name": "Telefone",
+      "type": "manual",
+      "status": "Simulado",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "channel_4",
+      "workspaceId": "workspace_solution",
+      "name": "Site",
+      "type": "manual",
+      "status": "Simulado",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "channel_5",
+      "workspaceId": "workspace_solution",
+      "name": "Indicacao",
+      "type": "manual",
+      "status": "Simulado",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "channel_6",
+      "workspaceId": "workspace_solution",
+      "name": "Convenio",
+      "type": "manual",
+      "status": "Simulado",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "channel_7",
+      "workspaceId": "workspace_solution",
+      "name": "Presencial",
+      "type": "manual",
+      "status": "Simulado",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "channel_8",
+      "workspaceId": "workspace_solution",
+      "name": "Manual",
+      "type": "manual",
+      "status": "Simulado",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "funnels": [
+    {
+      "id": "funnel_gravacao",
+      "workspaceId": "workspace_solution",
+      "name": "Gravacao",
+      "status": "active",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "stages": [
+    {
+      "id": "stage_n8n",
+      "workspaceId": "workspace_solution",
+      "funnelId": "funnel_gravacao",
+      "name": "N8N / Robô",
+      "color": "red",
+      "order": 0,
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "stage_aulas",
+      "workspaceId": "workspace_solution",
+      "funnelId": "funnel_gravacao",
+      "name": "Triagem",
+      "color": "blue",
+      "order": 1,
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "stage_audio",
+      "workspaceId": "workspace_solution",
+      "funnelId": "funnel_gravacao",
+      "name": "Consulta marcada",
+      "color": "purple",
+      "order": 2,
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "stage_prova",
+      "workspaceId": "workspace_solution",
+      "funnelId": "funnel_gravacao",
+      "name": "Em tratamento",
+      "color": "green",
+      "order": 3,
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "stage_finalizada",
+      "workspaceId": "workspace_solution",
+      "funnelId": "funnel_gravacao",
+      "name": "Alta / concluido",
+      "color": "orange",
+      "order": 4,
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "contacts": [
+    {
+      "id": "contact_1",
+      "workspaceId": "workspace_solution",
+      "name": "Camila Andrade",
+      "phone": "+5511982221401",
+      "email": "camila.andrade@email.com",
+      "avatarUrl": "",
+      "channelId": "channel_1",
+      "departmentId": "dep_recepcao",
+      "tagIds": [
+        "tag_2"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "contact_2",
+      "workspaceId": "workspace_solution",
+      "name": "Joao Pedro Lima",
+      "phone": "+5511977778831",
+      "email": "joao.lima@email.com",
+      "avatarUrl": "",
+      "channelId": "channel_1",
+      "departmentId": "dep_consultorios",
+      "tagIds": [
+        "tag_3"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "contact_3",
+      "workspaceId": "workspace_solution",
+      "name": "Marcia Figueiredo",
+      "phone": "+5511966662209",
+      "email": "marcia.fig@email.com",
+      "avatarUrl": "",
+      "channelId": "channel_2",
+      "departmentId": "dep_exames",
+      "tagIds": [
+        "tag_5"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "contact_4",
+      "workspaceId": "workspace_solution",
+      "name": "Roberto Santana",
+      "phone": "+5511955550192",
+      "email": "roberto.santana@email.com",
+      "avatarUrl": "",
+      "channelId": "channel_1",
+      "departmentId": "dep_cirurgico",
+      "tagIds": [
+        "tag_4"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "contact_5",
+      "workspaceId": "workspace_solution",
+      "name": "Patricia Gomes",
+      "phone": "+5511944447820",
+      "email": "patricia.gomes@email.com",
+      "avatarUrl": "",
+      "channelId": "channel_1",
+      "departmentId": "dep_triagem",
+      "tagIds": [
+        "tag_1"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "tags": [
+    {
+      "id": "tag_1",
+      "workspaceId": "workspace_solution",
+      "name": "particular",
+      "color": "#ef4444",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "tag_2",
+      "workspaceId": "workspace_solution",
+      "name": "convenio",
+      "color": "#3498db",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "tag_3",
+      "workspaceId": "workspace_solution",
+      "name": "retorno",
+      "color": "#22c55e",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "tag_4",
+      "workspaceId": "workspace_solution",
+      "name": "pre-operatorio",
+      "color": "#f59e0b",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "tag_5",
+      "workspaceId": "workspace_solution",
+      "name": "prioritario",
+      "color": "#8b5cf6",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "cards": [
+    {
+      "id": "card_1",
+      "workspaceId": "workspace_solution",
+      "title": "Paciente - Camila Andrade",
+      "description": "Robô iniciou triagem e paciente escolheu marcar consulta.",
+      "contactId": "contact_1",
+      "phone": "+5511982221401",
+      "funnelId": "funnel_gravacao",
+      "stageId": "stage_n8n",
+      "departmentId": "dep_recepcao",
+      "channelId": "channel_1",
+      "assignedUserId": "user_admin",
+      "priority": "normal",
+      "status": "aberto",
+      "value": 0,
+      "position": 0,
+      "dueAt": "",
+      "lastMessageAt": "2026-05-20T12:00:00.000Z",
+      "tagIds": [
+        "tag_2"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "card_2",
+      "workspaceId": "workspace_solution",
+      "title": "Paciente - Joao Pedro Lima",
+      "description": "Paciente pediu remarcação pelo menu automático.",
+      "contactId": "contact_2",
+      "phone": "+5511977778831",
+      "funnelId": "funnel_gravacao",
+      "stageId": "stage_audio",
+      "departmentId": "dep_consultorios",
+      "channelId": "channel_1",
+      "assignedUserId": "user_admin",
+      "priority": "normal",
+      "status": "aberto",
+      "value": 0,
+      "position": 1,
+      "dueAt": "",
+      "lastMessageAt": "2026-05-20T12:00:00.000Z",
+      "tagIds": [
+        "tag_3"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "card_3",
+      "workspaceId": "workspace_solution",
+      "title": "Paciente - Marcia Figueiredo",
+      "description": "Paciente solicitou orientação para exame.",
+      "contactId": "contact_3",
+      "phone": "+5511966662209",
+      "funnelId": "funnel_gravacao",
+      "stageId": "stage_aulas",
+      "departmentId": "dep_exames",
+      "channelId": "channel_2",
+      "assignedUserId": "user_cardio",
+      "priority": "normal",
+      "status": "aberto",
+      "value": 0,
+      "position": 2,
+      "dueAt": "",
+      "lastMessageAt": "2026-05-20T12:00:00.000Z",
+      "tagIds": [
+        "tag_5"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "card_4",
+      "workspaceId": "workspace_solution",
+      "title": "Paciente - Roberto Santana",
+      "description": "Paciente confirmou dados para cirurgia.",
+      "contactId": "contact_4",
+      "phone": "+5511955550192",
+      "funnelId": "funnel_gravacao",
+      "stageId": "stage_prova",
+      "departmentId": "dep_cirurgico",
+      "channelId": "channel_1",
+      "assignedUserId": "user_ortopedia",
+      "priority": "alta",
+      "status": "aberto",
+      "value": 0,
+      "position": 3,
+      "dueAt": "",
+      "lastMessageAt": "2026-05-20T12:00:00.000Z",
+      "tagIds": [
+        "tag_4"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "card_5",
+      "workspaceId": "workspace_solution",
+      "title": "Paciente - Patricia Gomes",
+      "description": "Paciente pediu falar com atendente humano.",
+      "contactId": "contact_5",
+      "phone": "+5511944447820",
+      "funnelId": "funnel_gravacao",
+      "stageId": "stage_n8n",
+      "departmentId": "dep_triagem",
+      "channelId": "channel_1",
+      "assignedUserId": "user_admin",
+      "priority": "normal",
+      "status": "aberto",
+      "value": 0,
+      "position": 4,
+      "dueAt": "",
+      "lastMessageAt": "2026-05-20T12:00:00.000Z",
+      "tagIds": [
+        "tag_1"
+      ],
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg_1_1",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_1",
+      "cardId": "card_1",
+      "direction": "outbound",
+      "body": "Ola! Sou o assistente virtual da Clinica Vida Prime. Escolha uma das opcoes abaixo:\\n1 - Marcar consulta\\n2 - Remarcar consulta\\n3 - Confirmar consulta\\n4 - Exames e preparo\\n5 - Falar com atendente",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "msg_1_2",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_1",
+      "cardId": "card_1",
+      "direction": "inbound",
+      "body": "1",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:01:00.000Z"
+    },
+    {
+      "id": "msg_1_3",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_1",
+      "cardId": "card_1",
+      "direction": "outbound",
+      "body": "Perfeito. Para marcar consulta, escolha a especialidade:\\n1 - Clinica geral\\n2 - Cardiologia\\n3 - Ortopedia\\n4 - Dermatologia",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:02:00.000Z"
+    },
+    {
+      "id": "msg_1_4",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_1",
+      "cardId": "card_1",
+      "direction": "inbound",
+      "body": "2",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:03:00.000Z"
+    },
+    {
+      "id": "msg_1_5",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_1",
+      "cardId": "card_1",
+      "direction": "outbound",
+      "body": "Tenho horários com a Dra. Helena amanhã às 09:00 ou 14:30. Responda 1 para 09:00 ou 2 para 14:30.",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:04:00.000Z"
+    },
+    {
+      "id": "msg_1_6",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_1",
+      "cardId": "card_1",
+      "direction": "inbound",
+      "body": "1",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:05:00.000Z"
+    },
+    {
+      "id": "msg_1_7",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_1",
+      "cardId": "card_1",
+      "direction": "outbound",
+      "body": "Consulta cardiologica pre-agendada para amanha as 09:00. Enviaremos confirmacao final por aqui.",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:06:00.000Z"
+    },
+    {
+      "id": "msg_2_1",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_2",
+      "cardId": "card_2",
+      "direction": "outbound",
+      "body": "Ola! Sou o assistente virtual da Clinica Vida Prime. Escolha uma das opcoes abaixo:\\n1 - Marcar consulta\\n2 - Remarcar consulta\\n3 - Confirmar consulta\\n4 - Exames e preparo\\n5 - Falar com atendente",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:20:00.000Z"
+    },
+    {
+      "id": "msg_2_2",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_2",
+      "cardId": "card_2",
+      "direction": "inbound",
+      "body": "2",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:21:00.000Z"
+    },
+    {
+      "id": "msg_2_3",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_2",
+      "cardId": "card_2",
+      "direction": "outbound",
+      "body": "Sem problema. Envie o numero da opcao da consulta que deseja remarcar:\\n1 - Consulta de hoje 16:00\\n2 - Retorno sexta 10:30",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:22:00.000Z"
+    },
+    {
+      "id": "msg_2_4",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_2",
+      "cardId": "card_2",
+      "direction": "inbound",
+      "body": "1",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:23:00.000Z"
+    },
+    {
+      "id": "msg_2_5",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_2",
+      "cardId": "card_2",
+      "direction": "outbound",
+      "body": "Certo. Escolha o novo horário:\\n1 - Amanhã 11:00\\n2 - Quinta 15:00\\n3 - Sexta 08:30",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:24:00.000Z"
+    },
+    {
+      "id": "msg_2_6",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_2",
+      "cardId": "card_2",
+      "direction": "inbound",
+      "body": "2",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:25:00.000Z"
+    },
+    {
+      "id": "msg_2_7",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_2",
+      "cardId": "card_2",
+      "direction": "outbound",
+      "body": "Remarcacao registrada para quinta as 15:00. Digite 9 se quiser falar com a recepcao.",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:26:00.000Z"
+    },
+    {
+      "id": "msg_3_1",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_3",
+      "cardId": "card_3",
+      "direction": "outbound",
+      "body": "Ola! Sou o assistente virtual da Clinica Vida Prime. Escolha uma das opcoes abaixo:\\n1 - Marcar consulta\\n2 - Remarcar consulta\\n3 - Confirmar consulta\\n4 - Exames e preparo\\n5 - Falar com atendente",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:40:00.000Z"
+    },
+    {
+      "id": "msg_3_2",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_3",
+      "cardId": "card_3",
+      "direction": "inbound",
+      "body": "4",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:41:00.000Z"
+    },
+    {
+      "id": "msg_3_3",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_3",
+      "cardId": "card_3",
+      "direction": "outbound",
+      "body": "Para qual exame voce precisa de preparo?\\n1 - Eletrocardiograma\\n2 - Risco cirurgico\\n3 - Exames laboratoriais",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:42:00.000Z"
+    },
+    {
+      "id": "msg_3_4",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_3",
+      "cardId": "card_3",
+      "direction": "inbound",
+      "body": "2",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:43:00.000Z"
+    },
+    {
+      "id": "msg_3_5",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_3",
+      "cardId": "card_3",
+      "direction": "outbound",
+      "body": "Preparo para risco cirurgico: leve exames anteriores, documento com foto e chegue 20 minutos antes. Deseja confirmar presenca?\\n1 - Sim\\n2 - Nao",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:44:00.000Z"
+    },
+    {
+      "id": "msg_3_6",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_3",
+      "cardId": "card_3",
+      "direction": "inbound",
+      "body": "1",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T12:45:00.000Z"
+    },
+    {
+      "id": "msg_3_7",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_3",
+      "cardId": "card_3",
+      "direction": "outbound",
+      "body": "Presenca confirmada. Um lembrete sera enviado no dia anterior.",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T12:46:00.000Z"
+    },
+    {
+      "id": "msg_4_1",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_4",
+      "cardId": "card_4",
+      "direction": "outbound",
+      "body": "Ola! Sou o assistente virtual da Clinica Vida Prime. Escolha uma das opcoes abaixo:\\n1 - Marcar consulta\\n2 - Remarcar consulta\\n3 - Confirmar consulta\\n4 - Exames e preparo\\n5 - Falar com atendente",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T13:00:00.000Z"
+    },
+    {
+      "id": "msg_4_2",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_4",
+      "cardId": "card_4",
+      "direction": "inbound",
+      "body": "3",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T13:01:00.000Z"
+    },
+    {
+      "id": "msg_4_3",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_4",
+      "cardId": "card_4",
+      "direction": "outbound",
+      "body": "Encontrei uma cirurgia de joelho agendada para sexta as 13:00 com Dr. Rafael. Deseja confirmar?\\n1 - Confirmar\\n2 - Falar com equipe cirurgica",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T13:02:00.000Z"
+    },
+    {
+      "id": "msg_4_4",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_4",
+      "cardId": "card_4",
+      "direction": "inbound",
+      "body": "1",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T13:03:00.000Z"
+    },
+    {
+      "id": "msg_4_5",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_4",
+      "cardId": "card_4",
+      "direction": "outbound",
+      "body": "Cirurgia confirmada. Checklist pre-operatorio enviado: jejum de 8h, exames em maos e chegada as 11:30.",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T13:04:00.000Z"
+    },
+    {
+      "id": "msg_5_1",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_5",
+      "cardId": "card_5",
+      "direction": "outbound",
+      "body": "Ola! Sou o assistente virtual da Clinica Vida Prime. Escolha uma das opcoes abaixo:\\n1 - Marcar consulta\\n2 - Remarcar consulta\\n3 - Confirmar consulta\\n4 - Exames e preparo\\n5 - Falar com atendente",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T13:20:00.000Z"
+    },
+    {
+      "id": "msg_5_2",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_5",
+      "cardId": "card_5",
+      "direction": "inbound",
+      "body": "5",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T13:21:00.000Z"
+    },
+    {
+      "id": "msg_5_3",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_5",
+      "cardId": "card_5",
+      "direction": "outbound",
+      "body": "Tudo bem. Vou transferir para a recepcao. Enquanto isso, diga em poucas palavras o que voce precisa.",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T13:22:00.000Z"
+    },
+    {
+      "id": "msg_5_4",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_5",
+      "cardId": "card_5",
+      "direction": "inbound",
+      "body": "Quero saber se meu convenio cobre consulta com ortopedista.",
+      "provider": "whatsapp",
+      "status": "received",
+      "createdAt": "2026-05-20T13:23:00.000Z"
+    },
+    {
+      "id": "msg_5_5",
+      "workspaceId": "workspace_solution",
+      "contactId": "contact_5",
+      "cardId": "card_5",
+      "direction": "outbound",
+      "body": "Recebido. A recepcao ja foi acionada e respondera por aqui.",
+      "provider": "mock-n8n",
+      "status": "sent",
+      "createdAt": "2026-05-20T13:24:00.000Z"
+    }
+  ],
+  "appointments": [
+    {
+      "id": "appointment_1",
+      "workspaceId": "workspace_solution",
+      "title": "Consulta cardiologica",
+      "type": "Consulta",
+      "description": "Agenda medica demonstrativa, sem paciente vinculado.",
+      "date": "2026-05-21",
+      "startTime": "09:00",
+      "endTime": "09:45",
+      "contactId": "",
+      "cardId": "",
+      "departmentId": "dep_consultorios",
+      "assignedUserId": "user_cardio",
+      "room": "Consultorio 1",
+      "status": "pendente",
+      "reminderMinutes": 30,
+      "notes": "",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "appointment_2",
+      "workspaceId": "workspace_solution",
+      "title": "Cirurgia de joelho",
+      "type": "Cirurgia",
+      "description": "Agenda medica demonstrativa, sem paciente vinculado.",
+      "date": "2026-05-22",
+      "startTime": "13:00",
+      "endTime": "15:30",
+      "contactId": "",
+      "cardId": "",
+      "departmentId": "dep_cirurgico",
+      "assignedUserId": "user_ortopedia",
+      "room": "Sala cirurgica 2",
+      "status": "confirmado",
+      "reminderMinutes": 30,
+      "notes": "",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "appointment_3",
+      "workspaceId": "workspace_solution",
+      "title": "Reuniao de equipe clinica",
+      "type": "Reuniao",
+      "description": "Agenda medica demonstrativa, sem paciente vinculado.",
+      "date": "2026-05-23",
+      "startTime": "08:00",
+      "endTime": "08:40",
+      "contactId": "",
+      "cardId": "",
+      "departmentId": "dep_triagem",
+      "assignedUserId": "user_admin",
+      "room": "Consultorio 3",
+      "status": "pendente",
+      "reminderMinutes": 30,
+      "notes": "",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "appointment_4",
+      "workspaceId": "workspace_solution",
+      "title": "Retorno pos-operatorio",
+      "type": "Retorno",
+      "description": "Agenda medica demonstrativa, sem paciente vinculado.",
+      "date": "2026-05-24",
+      "startTime": "10:30",
+      "endTime": "11:00",
+      "contactId": "",
+      "cardId": "",
+      "departmentId": "dep_consultorios",
+      "assignedUserId": "user_ortopedia",
+      "room": "Consultorio 4",
+      "status": "pendente",
+      "reminderMinutes": 30,
+      "notes": "",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "appointment_5",
+      "workspaceId": "workspace_solution",
+      "title": "Exame de risco cirurgico",
+      "type": "Exame",
+      "description": "Agenda medica demonstrativa, sem paciente vinculado.",
+      "date": "2026-05-25",
+      "startTime": "15:00",
+      "endTime": "15:30",
+      "contactId": "",
+      "cardId": "",
+      "departmentId": "dep_exames",
+      "assignedUserId": "user_cardio",
+      "room": "Consultorio 5",
+      "status": "pendente",
+      "reminderMinutes": 30,
+      "notes": "",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "campaigns": [],
+  "campaignRecipients": [],
+  "groups": [],
+  "groupContacts": [],
+  "automationBots": [
+    {
+      "id": "bot_1",
+      "workspaceId": "workspace_solution",
+      "name": "Confirmacao de consulta",
+      "trigger": "agendamento proximo",
+      "condition": "tipo = Consulta",
+      "action": "enviar mensagem",
+      "status": "active",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    },
+    {
+      "id": "bot_2",
+      "workspaceId": "workspace_solution",
+      "name": "Checklist pre-cirurgico",
+      "trigger": "card entrou na etapa",
+      "condition": "etapa = Consulta marcada",
+      "action": "adicionar tag",
+      "status": "inactive",
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "activityLogs": [
+    {
+      "id": "act_1",
+      "type": "seed",
+      "entityType": "workspace",
+      "entityId": "workspace_solution",
+      "description": "Workspace Clinica Solution criado com conversas exemplo do robo",
+      "userId": "user_admin",
+      "createdAt": "2026-05-20T12:00:00.000Z"
+    }
+  ],
+  "settings": [
+    {
+      "id": "settings_main",
+      "workspaceId": "workspace_solution",
+      "companyName": "Clinica Solution",
+      "email": "contato@clinicasolution.com",
+      "phone": "+554999999999",
+      "timezone": "America/Sao_Paulo",
+      "language": "pt-BR",
+      "theme": "light",
+      "density": "comfortable",
+      "primaryColor": "#ef5a3c",
+      "integrations": {
+        "gupshup": {
+          "status": "Simulado",
+          "tokenMasked": "********"
+        },
+        "meta": {
+          "status": "Simulado",
+          "tokenMasked": "********"
+        },
+        "ihelp": {
+          "status": "Simulado",
+          "tokenMasked": "********"
+        },
+        "webhook": {
+          "status": "Simulado",
+          "url": "/api/webhooks/inbound-message"
+        }
+      },
+      "profile": {
+        "name": "Dra. Marina Costa",
+        "email": "marina@clinicasolution.com",
+        "whatsapp": "+55",
+        "title": "Diretora Clinica",
+        "notifications": true,
+        "twoFactor": false,
+        "memberSince": "fevereiro de 2026"
+      },
+      "createdAt": "2026-05-20T12:00:00.000Z",
+      "updatedAt": "2026-05-20T12:00:00.000Z"
+    }
+  ]
+}
