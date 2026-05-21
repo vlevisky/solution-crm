@@ -3,7 +3,7 @@ import express from 'express'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { randomUUID } from 'node:crypto'
+import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import { createMessageProvider } from './services/messageProviders.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -13,6 +13,9 @@ const dbDir = path.join(__dirname, 'db')
 const dbFile = path.join(dbDir, 'db.json')
 const app = express()
 const provider = createMessageProvider()
+const sessionCookie = 'solution_crm_session'
+const sessionSecret = process.env.SESSION_SECRET || 'solution-crm-dev-secret'
+const sessionMaxAge = 60 * 60 * 24 * 7
 
 app.use(cors())
 app.use(express.json({ limit: '2mb' }))
@@ -65,6 +68,61 @@ function cleanObject(input = {}) {
   return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, clean(value)]))
 }
 
+function hashPassword(password, salt = randomBytes(16).toString('hex')) {
+  return { salt, hash: scryptSync(String(password), salt, 64).toString('hex') }
+}
+
+function verifyPassword(password, salt, hash) {
+  if (!salt || !hash) return false
+  const candidate = Buffer.from(hashPassword(password, salt).hash, 'hex')
+  const stored = Buffer.from(hash, 'hex')
+  return stored.length === candidate.length && timingSafeEqual(stored, candidate)
+}
+
+function publicUser(user = {}) {
+  const { passwordHash, passwordSalt, ...safeUser } = user
+  return safeUser
+}
+
+function signSession(userId) {
+  const payload = Buffer.from(JSON.stringify({ userId, exp: Date.now() + sessionMaxAge * 1000 })).toString('base64url')
+  const signature = createHmac('sha256', sessionSecret).update(payload).digest('base64url')
+  return `${payload}.${signature}`
+}
+
+function readCookies(req) {
+  return Object.fromEntries(String(req.headers.cookie || '').split(';').map((item) => item.trim()).filter(Boolean).map((item) => {
+    const index = item.indexOf('=')
+    return [decodeURIComponent(item.slice(0, index)), decodeURIComponent(item.slice(index + 1))]
+  }))
+}
+
+function verifySession(value = '') {
+  try {
+    const [payload, signature] = value.split('.')
+    if (!payload || !signature) return null
+    const expected = createHmac('sha256', sessionSecret).update(payload).digest('base64url')
+    const signatureBuffer = Buffer.from(signature)
+    const expectedBuffer = Buffer.from(expected)
+    const valid = signatureBuffer.length === expectedBuffer.length && timingSafeEqual(signatureBuffer, expectedBuffer)
+    if (!valid) return null
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    if (!parsed.userId || parsed.exp < Date.now()) return null
+    return parsed.userId
+  } catch {
+    return null
+  }
+}
+
+function setSession(res, userId) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  res.setHeader('Set-Cookie', `${sessionCookie}=${encodeURIComponent(signSession(userId))}; HttpOnly; Path=/; Max-Age=${sessionMaxAge}; SameSite=Lax${secure}`)
+}
+
+function clearSession(res) {
+  res.setHeader('Set-Cookie', `${sessionCookie}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`)
+}
+
 function normalizePhone(phone = '') {
   const digits = String(phone).replace(/\D/g, '')
   if (!digits) return ''
@@ -78,6 +136,12 @@ function ensureName(payload, field = 'name') {
     error.status = 400
     throw error
   }
+}
+
+function findUserByLogin(data, login) {
+  const value = clean(login || '').toLowerCase()
+  if (value === 'admin') return data.users.find((item) => item.id === 'user_admin')
+  return data.users.find((item) => item.email.toLowerCase() === value)
 }
 
 function seed() {
@@ -389,9 +453,9 @@ async function readDb() {
     const data = JSON.parse(raw)
     const defaults = seed()
     for (const collection of collections) data[collection] ||= defaults[collection] || []
-    return data
+    return migrateDisplayData(data)
   } catch {
-    const data = seed()
+    const data = migrateDisplayData(seed())
     await writeDb(data)
     return data
   }
@@ -408,6 +472,35 @@ function activity(data, type, entityType, entityId, description, userId = 'user_
 
 function byId(list, itemId) {
   return list.find((item) => item.id === itemId)
+}
+
+function migrateDisplayData(data) {
+  data.workspaces.forEach((workspace) => {
+    if (workspace.name === 'Clinica Solution') workspace.name = 'Clínica Solution'
+  })
+  data.settings.forEach((setting) => {
+    if (setting.companyName === 'Clinica Solution') setting.companyName = 'Clínica Solution'
+  })
+  const admin = byId(data.users, 'user_admin')
+  if (admin) Object.assign(admin, { name: 'Admin', email: 'admin@clinicasolution.com', title: 'Administrador', specialty: 'Administração', crm: '' })
+  const names = {
+    dep_recepcao: ['Recepção', 'Entrada de pacientes, check-in e autorizações'],
+    dep_triagem: ['Triagem', 'Classificação inicial e sinais vitais'],
+    dep_consultorios: ['Consultórios', 'Consultas médicas e retornos'],
+    dep_cirurgico: ['Centro Cirúrgico', 'Procedimentos, cirurgias e pré-operatório'],
+    dep_exames: ['Exames e Diagnóstico', 'Exames, laudos e preparos'],
+  }
+  data.departments.forEach((department) => {
+    const next = names[department.id]
+    if (next) [department.name, department.description] = next
+  })
+  const channelNames = ['Robô WhatsApp', 'WhatsApp', 'Telefone', 'Site', 'Indicação', 'Convênio', 'Presencial', 'Manual']
+  data.channels.forEach((channel, index) => {
+    channel.name = channelNames[index] || channel.name
+  })
+  const robotStage = byId(data.stages, 'stage_n8n')
+  if (robotStage) robotStage.name = 'N8N / Robô'
+  return data
 }
 
 function reportData(data) {
@@ -468,25 +561,89 @@ function reportData(data) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, provider: provider.constructor.name }))
 
-app.post('/api/auth/login', async (req, res, next) => {
+app.get('/api/auth/me', async (req, res, next) => {
   try {
     const data = await readDb()
-    const email = clean(req.body.email || '').toLowerCase()
-    const password = String(req.body.password || '')
-    const user = data.users.find((item) => item.email.toLowerCase() === email)
-    if (!user || !['123456', 'solution'].includes(password)) {
-      return res.status(401).json({ error: 'Email ou senha invalidos' })
-    }
-    res.json({ user, demoPassword: '123456' })
+    const userId = verifySession(readCookies(req)[sessionCookie])
+    const user = userId ? byId(data.users, userId) : null
+    if (!user) return res.status(401).json({ error: 'Sessao expirada' })
+    res.json({ user: publicUser(user) })
   } catch (error) {
     next(error)
   }
 })
 
+app.post('/api/auth/login', async (req, res, next) => {
+  try {
+    const data = await readDb()
+    const login = clean(req.body.email || req.body.login || '')
+    const password = String(req.body.password || '')
+    const user = findUserByLogin(data, login)
+    const isAdminShortcut = user?.id === 'user_admin' && login.toLowerCase() === 'admin' && password === 'admin'
+    const validPassword = user && (isAdminShortcut || verifyPassword(password, user.passwordSalt, user.passwordHash))
+    if (!user || !validPassword) {
+      return res.status(401).json({ error: 'Email ou senha inválidos' })
+    }
+    setSession(res, user.id)
+    res.json({ user: publicUser(user) })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/auth/register', async (req, res, next) => {
+  try {
+    const data = await readDb()
+    const payload = cleanObject(req.body)
+    const email = clean(payload.email || '').toLowerCase()
+    const password = String(payload.password || '')
+    if (!clean(payload.name) || !email || password.length < 6) {
+      return res.status(400).json({ error: 'Nome, email e senha com pelo menos 6 caracteres são obrigatórios' })
+    }
+    if (data.users.some((user) => user.email.toLowerCase() === email)) {
+      return res.status(409).json({ error: 'Este email já possui cadastro' })
+    }
+    const title = clean(payload.title || 'Profissional')
+    const specialty = clean(payload.specialty || '')
+    const medicalText = `${title} ${specialty}`.toLowerCase()
+    const role = medicalText.includes('medic') || medicalText.includes('médic') || specialty ? 'medico' : 'atendente'
+    const passwordData = hashPassword(password)
+    const user = {
+      id: id('user'),
+      workspaceId: 'workspace_solution',
+      name: payload.name,
+      email,
+      role,
+      title,
+      departmentId: payload.departmentId || 'dep_consultorios',
+      status: 'active',
+      avatarUrl: '',
+      specialty,
+      crm: clean(payload.crm || ''),
+      passwordSalt: passwordData.salt,
+      passwordHash: passwordData.hash,
+      createdAt: now(),
+      updatedAt: now(),
+    }
+    data.users.push(user)
+    activity(data, 'created', 'users', user.id, `Usuário criado: ${user.name}`, user.id)
+    await writeDb(data)
+    setSession(res, user.id)
+    res.status(201).json({ user: publicUser(user) })
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.post('/api/auth/logout', (_req, res) => {
+  clearSession(res)
+  res.json({ ok: true })
+})
+
 app.get('/api/bootstrap', async (_req, res, next) => {
   try {
     const data = await readDb()
-    res.json({ ...data, reports: reportData(data) })
+    res.json({ ...data, users: data.users.map(publicUser), reports: reportData(data) })
   } catch (error) {
     next(error)
   }
@@ -735,7 +892,7 @@ app.put('/api/settings', async (req, res, next) => {
       workspace.name = clean(req.body.companyName)
       workspace.updatedAt = now()
     }
-    activity(data, 'updated', 'settings', data.settings[0].id, 'Configuracoes atualizadas')
+    activity(data, 'updated', 'settings', data.settings[0].id, 'Configurações atualizadas')
     await writeDb(data)
     res.json(data.settings[0])
   } catch (error) {

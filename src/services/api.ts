@@ -2,6 +2,7 @@ import type { BootstrapData, User } from '../types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
     ...init,
   })
@@ -11,7 +12,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  login: (payload: { email: string; password: string }) => request<{ user: User; demoPassword?: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  me: () => request<{ user: User }>('/api/auth/me'),
+  login: (payload: { email: string; password: string }) => request<{ user: User }>('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  register: (payload: { name: string; email: string; password: string; title: string; specialty?: string; crm?: string; departmentId?: string }) => request<{ user: User }>('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
+  logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   bootstrap: () => request<BootstrapData>('/api/bootstrap'),
   create: <T>(resource: string, payload: unknown) => request<T>(`/api/${resource}`, { method: 'POST', body: JSON.stringify(payload) }),
   update: <T>(resource: string, id: string, payload: unknown) => request<T>(`/api/${resource}/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),

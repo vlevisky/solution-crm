@@ -132,21 +132,19 @@ const stageColors: Record<string, string> = {
 const pageTitles: Record<Page, string> = {
   atendimento: 'Atendimento',
   crm: 'CRM',
-  robos: 'Robos',
+  robos: 'Robôs',
   campanhas: 'Campanhas',
   emails: 'Emails',
   agendamentos: 'Agendamentos',
   contatos: 'Contatos',
   grupos: 'Grupos',
-  relatorios: 'Relatorios',
+  relatorios: 'Relatórios',
   dashboard: 'Dashboard',
   departamentos: 'Departamentos',
-  usuarios: 'Usuarios',
-  configuracoes: 'Configuracoes',
+  usuarios: 'Usuários',
+  configuracoes: 'Configurações',
   perfil: 'Meu Perfil',
 }
-
-const sessionKey = 'solution-crm-user'
 
 function isAdmin(user?: User | null) {
   return user?.role === 'administrador'
@@ -291,15 +289,8 @@ function App() {
 function SolutionCrm() {
   const toast = useToast()
   const [data, setData] = useState<BootstrapData | null>(null)
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const raw = window.localStorage.getItem(sessionKey)
-    if (!raw) return null
-    try {
-      return JSON.parse(raw) as User
-    } catch {
-      return null
-    }
-  })
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const [activePage, setActivePage] = useState<Page>('atendimento')
   const [collapsed, setCollapsed] = useState(false)
   const [selectedFunnelId, setSelectedFunnelId] = useState('funnel_gravacao')
@@ -320,12 +311,18 @@ function SolutionCrm() {
   async function login(email: string, password: string) {
     const result = await api.login({ email, password })
     setCurrentUser(result.user)
-    window.localStorage.setItem(sessionKey, JSON.stringify(result.user))
     toast.push({ type: 'success', title: `Bem-vindo, ${result.user.name}` })
   }
 
-  function logout() {
-    window.localStorage.removeItem(sessionKey)
+  async function register(payload: { name: string; email: string; password: string; title: string; specialty?: string; crm?: string; departmentId?: string }) {
+    const result = await api.register(payload)
+    setCurrentUser(result.user)
+    await refresh()
+    toast.push({ type: 'success', title: `Conta criada, ${result.user.name}` })
+  }
+
+  async function logout() {
+    await api.logout().catch(() => undefined)
     setCurrentUser(null)
     setActivePage('atendimento')
     setSelectedContactId('')
@@ -350,6 +347,21 @@ function SolutionCrm() {
   }, [toast])
 
   useEffect(() => {
+    let active = true
+    api.me()
+      .then((result) => {
+        if (active) setCurrentUser(result.user)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setAuthChecked(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
     if (!currentUser) return
     const allowed = allowedPagesFor(currentUser)
     if (!allowed.includes(activePage)) setActivePage('atendimento')
@@ -370,12 +382,12 @@ function SolutionCrm() {
       : null
   }, [data])
 
-  if (!data || !lookup) {
+  if (!data || !lookup || !authChecked) {
     return <Skeleton />
   }
 
   if (!currentUser) {
-    return <LoginPage data={data} onLogin={login} />
+    return <LoginPage data={data} onLogin={login} onRegister={register} />
   }
 
   const visibleData = scopeDataForUser(data, currentUser)
@@ -396,7 +408,7 @@ function SolutionCrm() {
     email: currentUser.email,
     title: currentUser.title,
   }
-  const accountScope = isAdmin(currentUser) ? 'Administradora' : currentUser.specialty || currentUser.title || 'Medico'
+  const accountScope = isAdmin(currentUser) ? 'Administrador' : currentUser.specialty || currentUser.title || 'Profissional'
 
   function openCreate(mode: FormMode, seed: FormState = {}) {
     setEditingId('')
@@ -454,7 +466,6 @@ function SolutionCrm() {
         if (currentUser) {
           const updatedUser = await api.update<User>('users', currentUser.id, payload)
           setCurrentUser(updatedUser)
-          window.localStorage.setItem(sessionKey, JSON.stringify(updatedUser))
         }
         if (currentUser && isAdmin(currentUser)) {
           await api.updateSettings({ profile: { ...settings.profile, ...payload } })
@@ -468,9 +479,9 @@ function SolutionCrm() {
       }
       await refresh()
       setFormMode(null)
-      toast.push({ type: 'success', title: 'Alteracoes salvas' })
+      toast.push({ type: 'success', title: 'Alterações salvas' })
     } catch (error) {
-      toast.push({ type: 'error', title: 'Nao foi possivel salvar', message: error instanceof Error ? error.message : 'Erro desconhecido' })
+      toast.push({ type: 'error', title: 'Não foi possível salvar', message: error instanceof Error ? error.message : 'Erro desconhecido' })
     } finally {
       setSaving(false)
     }
@@ -484,7 +495,7 @@ function SolutionCrm() {
       await refresh()
       toast.push({ type: 'success', title: 'Registro removido' })
     } catch (error) {
-      toast.push({ type: 'error', title: 'Nao foi possivel remover', message: error instanceof Error ? error.message : 'Erro desconhecido' })
+      toast.push({ type: 'error', title: 'Não foi possível remover', message: error instanceof Error ? error.message : 'Erro desconhecido' })
     }
   }
 
@@ -533,7 +544,7 @@ function SolutionCrm() {
       await api.moveCard(cardId, { stageId, position: data!.cards.filter((card) => card.stageId === stageId).length })
       await refresh()
     } catch (error) {
-      toast.push({ type: 'error', title: 'Nao foi possivel mover o card', message: error instanceof Error ? error.message : 'Erro desconhecido' })
+      toast.push({ type: 'error', title: 'Não foi possível mover o card', message: error instanceof Error ? error.message : 'Erro desconhecido' })
     }
   }
 
@@ -649,7 +660,7 @@ function SolutionCrm() {
             lookup={visibleLookup}
             currentUser={currentUser}
             onCreate={(seed) => openCreate('appointment', seed || {})}
-            onCreateDoctor={() => openCreate('user', { role: 'medico', title: 'Medico(a)', departmentId: 'dep_consultorios' })}
+            onCreateDoctor={() => openCreate('user', { role: 'medico', title: 'Médico(a)', departmentId: 'dep_consultorios' })}
             onEdit={(appointment) => openEdit('appointment', appointment)}
             onDelete={(appointment) => setConfirm({ resource: 'appointments', id: appointment.id, title: 'Excluir agendamento', description: `Deseja excluir ${appointment.title}?` })}
             onOpen={(appointment) => setDrawer({ type: 'appointment', id: appointment.id })}
@@ -690,20 +701,29 @@ function SolutionCrm() {
   )
 }
 
-function LoginPage({ data, onLogin }: { data: BootstrapData; onLogin: (email: string, password: string) => Promise<void> }) {
+function LoginPage({ data, onLogin, onRegister }: { data: BootstrapData; onLogin: (email: string, password: string) => Promise<void>; onRegister: (payload: { name: string; email: string; password: string; title: string; specialty?: string; crm?: string; departmentId?: string }) => Promise<void> }) {
   const toast = useToast()
-  const [email, setEmail] = useState('marina@clinicasolution.com')
-  const [password, setPassword] = useState('123456')
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+  const [title, setTitle] = useState('')
+  const [specialty, setSpecialty] = useState('')
+  const [crm, setCrm] = useState('')
+  const [departmentId, setDepartmentId] = useState(data.departments[0]?.id || '')
   const [loading, setLoading] = useState(false)
-  const demoUsers = data.users.filter((user) => user.role === 'administrador' || user.role === 'medico')
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setLoading(true)
     try {
-      await onLogin(email, password)
+      if (mode === 'login') {
+        await onLogin(email, password)
+      } else {
+        await onRegister({ name, email, password, title, specialty, crm, departmentId })
+      }
     } catch (error) {
-      toast.push({ type: 'error', title: 'Nao foi possivel entrar', message: error instanceof Error ? error.message : 'Erro desconhecido' })
+      toast.push({ type: 'error', title: mode === 'login' ? 'Não foi possível entrar' : 'Não foi possível criar a conta', message: error instanceof Error ? error.message : 'Erro desconhecido' })
     } finally {
       setLoading(false)
     }
@@ -714,38 +734,56 @@ function LoginPage({ data, onLogin }: { data: BootstrapData; onLogin: (email: st
       <section className="login-branding">
         <div className="brand-mark"><Activity size={22} /></div>
         <span className="eyebrow">Solution CRM</span>
-        <h1>Atendimento clinico com acesso por perfil.</h1>
-        <p>Administradores acompanham toda a operacao. Medicos entram direto nos atendimentos, agenda e relatorios vinculados a eles.</p>
+        <h1>Atendimento clínico com acesso por perfil.</h1>
+        <p>Administradores acompanham toda a operação. Profissionais entram direto nos atendimentos, agenda e relatórios vinculados ao próprio perfil.</p>
         <div className="login-preview">
           <div><strong>{data.cards.length}</strong><span>atendimentos</span></div>
           <div><strong>{data.appointments.length}</strong><span>agendamentos</span></div>
-          <div><strong>{data.users.filter((user) => user.role === 'medico').length}</strong><span>medicos</span></div>
+          <div><strong>{data.users.filter((user) => user.role !== 'administrador').length}</strong><span>profissionais</span></div>
         </div>
       </section>
       <section className="login-panel">
         <div>
           <span className="eyebrow">Acesso seguro</span>
-          <h2>Entrar no CRM</h2>
-          <p className="muted">Use uma das contas de demonstracao. Senha: 123456.</p>
+          <h2>{mode === 'login' ? 'Entrar no CRM' : 'Criar acesso'}</h2>
+          <p className="muted">{mode === 'login' ? 'Entre com seu email e senha. O acesso administrativo padrão é admin / admin.' : 'Crie uma conta para um profissional da clínica. O cargo informado define o perfil de trabalho.'}</p>
+        </div>
+        <div className="login-tabs" role="tablist" aria-label="Acesso">
+          <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>Entrar</button>
+          <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>Criar conta</button>
         </div>
         <form onSubmit={submit} className="login-form">
+          {mode === 'register' ? (
+            <>
+              <Field label="Nome completo">
+                <Input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
+              </Field>
+              <Field label="Cargo">
+                <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex: Médico cardiologista, recepção, financeiro" />
+              </Field>
+              <div className="login-form-row">
+                <Field label="Especialidade">
+                  <Input value={specialty} onChange={(event) => setSpecialty(event.target.value)} placeholder="Opcional" />
+                </Field>
+                <Field label="CRM/registro">
+                  <Input value={crm} onChange={(event) => setCrm(event.target.value)} placeholder="Opcional" />
+                </Field>
+              </div>
+              <Field label="Departamento">
+                <Select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
+                  {data.departments.map((department) => <option value={department.id} key={department.id}>{department.name}</option>)}
+                </Select>
+              </Field>
+            </>
+          ) : null}
           <Field label="Email">
-            <Input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" />
+            <Input value={email} onChange={(event) => setEmail(event.target.value)} type={mode === 'login' ? 'text' : 'email'} autoComplete="email" />
           </Field>
           <Field label="Senha">
-            <Input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" />
+            <Input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
           </Field>
-          <Button loading={loading} type="submit">Entrar</Button>
+          <Button loading={loading} type="submit">{mode === 'login' ? 'Entrar' : 'Criar conta e entrar'}</Button>
         </form>
-        <div className="login-users">
-          {demoUsers.map((user) => (
-            <button type="button" key={user.id} onClick={() => { setEmail(user.email); setPassword('123456') }}>
-              <span className="avatar">{initials(user.name)}</span>
-              <strong>{user.name}</strong>
-              <small>{user.role === 'administrador' ? 'Administradora - ve tudo' : `${user.specialty || user.title} - ve apenas seus atendimentos`}</small>
-            </button>
-          ))}
-        </div>
       </section>
     </main>
   )
@@ -753,10 +791,10 @@ function LoginPage({ data, onLogin }: { data: BootstrapData; onLogin: (email: st
 
 function Sidebar({ activePage, collapsed, accountName, profileName, accountScope, allowedPages, onNavigate, onToggle }: { activePage: Page; collapsed: boolean; accountName: string; profileName: string; accountScope: string; allowedPages: Page[]; onNavigate: (page: Page) => void; onToggle: () => void }) {
   const baseSections: Array<{ title: string; items: Array<{ page: Page; icon: ReactNode; label: string }> }> = [
-    { title: 'PRINCIPAL', items: [{ page: 'atendimento', icon: <MessageCircle />, label: 'Atendimento' }, { page: 'crm', icon: <BriefcaseBusiness />, label: 'CRM' }, { page: 'robos', icon: <Bot />, label: 'Robos' }] },
-    { title: 'OPERACOES', items: [{ page: 'campanhas', icon: <Send />, label: 'Campanhas' }, { page: 'emails', icon: <Mail />, label: 'Emails' }, { page: 'agendamentos', icon: <CalendarDays />, label: 'Agendamentos' }, { page: 'contatos', icon: <ClipboardList />, label: 'Contatos' }, { page: 'grupos', icon: <Users />, label: 'Grupos' }] },
-    { title: 'DADOS', items: [{ page: 'relatorios', icon: <BarChart3 />, label: 'Relatorios' }, { page: 'dashboard', icon: <LayoutDashboard />, label: 'Dashboard' }] },
-    { title: 'SISTEMA', items: [{ page: 'departamentos', icon: <Inbox />, label: 'Departamentos' }, { page: 'usuarios', icon: <UserPlus />, label: 'Usuarios' }, { page: 'configuracoes', icon: <Settings />, label: 'Configuracoes' }, { page: 'perfil', icon: <CircleUserRound />, label: 'Meu Perfil' }] },
+    { title: 'PRINCIPAL', items: [{ page: 'atendimento', icon: <MessageCircle />, label: 'Atendimento' }, { page: 'crm', icon: <BriefcaseBusiness />, label: 'CRM' }, { page: 'robos', icon: <Bot />, label: 'Robôs' }] },
+    { title: 'OPERAÇÕES', items: [{ page: 'campanhas', icon: <Send />, label: 'Campanhas' }, { page: 'emails', icon: <Mail />, label: 'Emails' }, { page: 'agendamentos', icon: <CalendarDays />, label: 'Agendamentos' }, { page: 'contatos', icon: <ClipboardList />, label: 'Contatos' }, { page: 'grupos', icon: <Users />, label: 'Grupos' }] },
+    { title: 'DADOS', items: [{ page: 'relatorios', icon: <BarChart3 />, label: 'Relatórios' }, { page: 'dashboard', icon: <LayoutDashboard />, label: 'Dashboard' }] },
+    { title: 'SISTEMA', items: [{ page: 'departamentos', icon: <Inbox />, label: 'Departamentos' }, { page: 'usuarios', icon: <UserPlus />, label: 'Usuários' }, { page: 'configuracoes', icon: <Settings />, label: 'Configurações' }, { page: 'perfil', icon: <CircleUserRound />, label: 'Meu Perfil' }] },
   ]
   const sections = baseSections.map((section) => ({ ...section, items: section.items.filter((item) => allowedPages.includes(item.page)) })).filter((section) => section.items.length)
   return (
@@ -796,7 +834,7 @@ function Topbar({ title, accountName, currentUser, onOpenProfile, onLogout }: { 
         <h1>{title}</h1>
       </div>
       <div className="top-actions">
-        <span className="session-chip">{currentUser.role === 'administrador' ? 'Visao geral' : 'Meus atendimentos'}</span>
+        <span className="session-chip">{currentUser.role === 'administrador' ? 'Visão geral' : 'Meus atendimentos'}</span>
         <Button variant="secondary"><Search size={16} /> Busca global</Button>
         <IconButton aria-label="Abrir perfil" onClick={onOpenProfile}><CircleUserRound size={22} /></IconButton>
         <IconButton aria-label="Sair" onClick={onLogout}><LogOut size={20} /></IconButton>
@@ -1052,8 +1090,8 @@ function DashboardPage({ data }: { data: BootstrapData; lookup: Lookup }) {
         <StatCard label="Agendamentos hoje" value={s.appointmentsToday} icon={<CalendarDays />} accent="#f59e0b" />
         <StatCard label="Campanhas ativas" value={s.activeCampaigns} icon={<Send />} />
         <StatCard label="Departamentos" value={s.departments} icon={<Inbox />} accent="#8b5cf6" />
-        <StatCard label="Usuarios" value={s.users} icon={<CircleUserRound />} />
-        <StatCard label="Taxa de conversao" value={`${s.conversionRate}%`} icon={<Gauge />} accent="#22c55e" />
+        <StatCard label="Usuários" value={s.users} icon={<CircleUserRound />} />
+        <StatCard label="Taxa de conversão" value={`${s.conversionRate}%`} icon={<Gauge />} accent="#22c55e" />
       </div>
       <div className="chart-grid">
         <SimpleBar title="Cards por etapa" data={data.reports.charts.byStage} dataKey="cards" />
@@ -1123,12 +1161,12 @@ function EmailsPage({ data, lookup, currentUser, onCreateTemplate, onEditTemplat
   return (
     <section className="page-flow email-page">
       <div className="page-head">
-        <PageIntro title="Emails" subtitle="Caixa de entrada por medico, modelos personalizados e envio para clientes." />
+        <PageIntro title="Emails" subtitle="Caixa de entrada por médico, modelos personalizados e envio para clientes." />
         <Button onClick={onCreateTemplate}><Plus size={16} /> Novo template</Button>
       </div>
       <div className="email-stats">
         <StatCard label="Recebidos" value={inboundCount} icon={<Mail />} />
-        <StatCard label="Nao lidos" value={unreadCount} icon={<Inbox />} accent="#f59e0b" />
+        <StatCard label="Não lidos" value={unreadCount} icon={<Inbox />} accent="#f59e0b" />
         <StatCard label="Enviados" value={sentCount} icon={<Send />} accent="#22c55e" />
       </div>
       <div className="email-layout">
@@ -1238,25 +1276,25 @@ function AppointmentsPage({ data, lookup, currentUser, onCreate, onCreateDoctor,
   return (
     <section className="page-flow">
       <div className="page-head">
-        <PageIntro title="Agenda medica" subtitle="Controle consultas, cirurgias, exames, retornos e reunioes por medico." />
+        <PageIntro title="Agenda médica" subtitle="Controle consultas, cirurgias, exames, retornos e reuniões por médico." />
         <div className="top-actions">
-          {canManageDoctors ? <Button variant="secondary" onClick={onCreateDoctor}><UserPlus size={16} /> Novo medico</Button> : null}
+          {canManageDoctors ? <Button variant="secondary" onClick={onCreateDoctor}><UserPlus size={16} /> Novo médico</Button> : null}
           <Button onClick={() => onCreate({ assignedUserId: defaultDoctorId })}><Plus size={16} /> Novo Agendamento</Button>
         </div>
       </div>
       <section className="clinic-command panel">
         <div>
           <span className="eyebrow">Central clinica</span>
-          <h2>Mapa do dia por medico</h2>
+          <h2>Mapa do dia por médico</h2>
           <p className="muted">Agenda inteligente para evitar choque de sala, preparar equipe e enxergar procedimentos criticos.</p>
         </div>
-        <StatCard label="Medicos ativos" value={doctors.length} icon={<CircleUserRound />} accent="#3498db" />
+        <StatCard label="Médicos ativos" value={doctors.length} icon={<CircleUserRound />} accent="#3498db" />
         <StatCard label="Cirurgias no periodo" value={surgicalToday} icon={<ShieldCheck />} accent="#ef4444" />
         <StatCard label="Confirmados" value={confirmed} icon={<CheckCircle2 />} accent="#22c55e" />
       </section>
       <div className="filters-line panel">
         <div className="segmented wide">{['mes', 'semana', 'lista'].map((item) => <button className={view === item ? 'active' : ''} key={item} onClick={() => setView(item as 'mes')}>{item}</button>)}</div>
-        <Field label="Medico"><Select value={doctorFilter} onChange={(event) => setDoctorFilter(event.target.value)} disabled={!canManageDoctors}>{canManageDoctors ? <option>Todos</option> : null}{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name} - {doctor.specialty || doctor.title}</option>)}</Select></Field>
+        <Field label="Médico"><Select value={doctorFilter} onChange={(event) => setDoctorFilter(event.target.value)} disabled={!canManageDoctors}>{canManageDoctors ? <option>Todos</option> : null}{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name} - {doctor.specialty || doctor.title}</option>)}</Select></Field>
         <div className="month-switcher">
           <IconButton aria-label="Mes anterior" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></IconButton>
           <strong>{monthLabel(selectedMonth)}</strong>
@@ -1268,11 +1306,11 @@ function AppointmentsPage({ data, lookup, currentUser, onCreate, onCreateDoctor,
         <div className="calendar-grid">
           {days.map((day) => {
             const items = appointments.filter((appointment) => appointment.date === day)
-            return <button className="calendar-day" key={day} onClick={() => onCreate({ date: day, assignedUserId: defaultDoctorId })}><strong>{Number(day.slice(-2))}</strong>{items.map((item) => <span className={`appt-type ${String(item.type || 'Consulta').toLowerCase()}`} key={item.id} onClick={(event) => { event.stopPropagation(); onOpen(item) }}>{item.title}<small>{lookup.users[item.assignedUserId]?.name || 'Medico'} - {item.startTime}</small></span>)}</button>
+            return <button className="calendar-day" key={day} onClick={() => onCreate({ date: day, assignedUserId: defaultDoctorId })}><strong>{Number(day.slice(-2))}</strong>{items.map((item) => <span className={`appt-type ${String(item.type || 'Consulta').toLowerCase()}`} key={item.id} onClick={(event) => { event.stopPropagation(); onOpen(item) }}>{item.title}<small>{lookup.users[item.assignedUserId]?.name || 'Médico'} - {item.startTime}</small></span>)}</button>
           })}
         </div>
       ) : (
-        <div className="panel">{appointments.map((appointment) => <div className="list-row" key={appointment.id}><div><strong>{appointment.title}</strong><span>{appointment.type || 'Consulta'} - {appointment.date} {appointment.startTime} - {lookup.users[appointment.assignedUserId]?.name || 'Sem medico'} - {appointment.room || 'Sem sala'}</span></div><Badge color={typeColors[appointment.type || 'Consulta'] || '#fef3c7'}>{appointment.status}</Badge><Button variant="secondary" onClick={() => onEdit(appointment)}>Editar</Button><Button variant="danger" onClick={() => onDelete(appointment)}>Excluir</Button></div>)}</div>
+        <div className="panel">{appointments.map((appointment) => <div className="list-row" key={appointment.id}><div><strong>{appointment.title}</strong><span>{appointment.type || 'Consulta'} - {appointment.date} {appointment.startTime} - {lookup.users[appointment.assignedUserId]?.name || 'Sem médico'} - {appointment.room || 'Sem sala'}</span></div><Badge color={typeColors[appointment.type || 'Consulta'] || '#fef3c7'}>{appointment.status}</Badge><Button variant="secondary" onClick={() => onEdit(appointment)}>Editar</Button><Button variant="danger" onClick={() => onDelete(appointment)}>Excluir</Button></div>)}</div>
       )}
     </section>
   )
@@ -1286,7 +1324,7 @@ function ReportsPage({ data, onExport }: { data: BootstrapData; onExport: () => 
         <Field label="Data Inicial"><Input type="date" defaultValue="2026-05-01" /></Field>
         <Field label="Data Final"><Input type="date" defaultValue="2026-05-21" /></Field>
         <Field label="Departamentos"><Select><option>Todos</option></Select></Field>
-        <Field label="Usuarios"><Select><option>Todos</option></Select></Field>
+        <Field label="Usuários"><Select><option>Todos</option></Select></Field>
         <Button><Filter size={16} /> Aplicar Filtros</Button>
         <Button variant="secondary" onClick={onExport}><Download size={16} /> Exportar CSV</Button>
       </div>
@@ -1295,8 +1333,8 @@ function ReportsPage({ data, onExport }: { data: BootstrapData; onExport: () => 
         {[
           ['Em aberto', s.openAttendances], ['Encerrados', s.closedAttendances], ['Total', s.totalAttendances],
           ['Ativos', s.active], ['Receptivos', s.receptive], ['Aguardando atendimento', s.waiting],
-          ['Tempo de espera medio', s.avgWait], ['Tempo de atendimento medio', s.avgService], ['Tempo de espera ativo', s.activeWait],
-          ['Cards criados', s.cardsCreated], ['Cards ganhos/concluidos', s.cardsWon], ['Campanhas enviadas', s.campaignsSent], ['Agendamentos concluidos', s.appointmentsDone],
+          ['Tempo de espera médio', s.avgWait], ['Tempo de atendimento médio', s.avgService], ['Tempo de espera ativo', s.activeWait],
+          ['Cards criados', s.cardsCreated], ['Cards ganhos/concluídos', s.cardsWon], ['Campanhas enviadas', s.campaignsSent], ['Agendamentos concluídos', s.appointmentsDone],
         ].map(([label, value]) => <StatCard key={String(label)} label={String(label)} value={value} icon={<Clock3 />} />)}
       </div>
       <div className="chart-grid wide">
@@ -1326,7 +1364,7 @@ function ContactsPage({ data, lookup, search, setSearch, onCreate, onEdit }: { d
     tags: contact.tagIds.map((tagId) => lookup.tags[tagId]?.name).join(', '),
     criado: formatDate(contact.createdAt),
   }))
-  return <CrudPage title="Contatos" subtitle="Base de contatos com historico, tags e origem." action="Criar contato" onCreate={onCreate} search={search} setSearch={setSearch}><DataTable columns={['nome', 'telefone', 'email', 'canal', 'departamento', 'tags', 'criado']} rows={rows} /></CrudPage>
+  return <CrudPage title="Contatos" subtitle="Base de contatos com histórico, tags e origem." action="Criar contato" onCreate={onCreate} search={search} setSearch={setSearch}><DataTable columns={['nome', 'telefone', 'email', 'canal', 'departamento', 'tags', 'criado']} rows={rows} /></CrudPage>
 }
 
 function GroupsPage({ data, onCreate, onEdit, onDelete }: { data: BootstrapData; onCreate: () => void; onEdit: (item: ContactGroup) => void; onDelete: (item: ContactGroup) => void }) {
@@ -1334,23 +1372,24 @@ function GroupsPage({ data, onCreate, onEdit, onDelete }: { data: BootstrapData;
 }
 
 function DepartmentsPage({ data, onCreate, onEdit, onDelete }: { data: BootstrapData; onCreate: () => void; onEdit: (item: Department) => void; onDelete: (item: Department) => void }) {
-  return <CrudCards title="Departamentos" subtitle="Setores que impactam cards, atendimentos e relatorios." action="Novo departamento" onCreate={onCreate} items={data.departments.map((department) => ({ id: department.id, title: department.name, description: department.description, meta: `${data.cards.filter((card) => card.departmentId === department.id).length} cards`, color: stageColors[department.color], onEdit: () => onEdit(department), onDelete: () => onDelete(department) }))} />
+  return <CrudCards title="Departamentos" subtitle="Setores que impactam cards, atendimentos e relatórios." action="Novo departamento" onCreate={onCreate} items={data.departments.map((department) => ({ id: department.id, title: department.name, description: department.description, meta: `${data.cards.filter((card) => card.departmentId === department.id).length} cards`, color: stageColors[department.color], onEdit: () => onEdit(department), onDelete: () => onDelete(department) }))} />
 }
 
 function UsersPage({ data, lookup, onCreate, onEdit, onDelete }: { data: BootstrapData; lookup: Lookup; onCreate: () => void; onEdit: (item: User) => void; onDelete: (item: User) => void }) {
-  const rows = data.users.map((user) => ({ id: user.id, nome: <button className="link-button" onClick={() => onEdit(user)}>{user.name}</button>, email: user.email, cargo: user.title, departamento: lookup.departments[user.departmentId]?.name, papel: user.role, status: user.status, acoes: <Button variant="danger" onClick={() => onDelete(user)}>Remover</Button> }))
-  return <CrudPage title="Usuarios" subtitle="Equipe, permissoes e atribuicoes." action="Criar usuario" onCreate={onCreate}><DataTable columns={['nome', 'email', 'cargo', 'departamento', 'papel', 'status', 'acoes']} rows={rows} /></CrudPage>
+  const rows = data.users.map((user) => ({ id: user.id, nome: <button className="link-button" onClick={() => onEdit(user)}>{user.name}</button>, email: user.email, cargo: user.title, departamento: lookup.departments[user.departmentId]?.name, papel: user.role, status: user.status, ações: <Button variant="danger" onClick={() => onDelete(user)}>Remover</Button> }))
+  return <CrudPage title="Usuários" subtitle="Equipe, permissões e atribuições." action="Criar usuário" onCreate={onCreate}><DataTable columns={['nome', 'email', 'cargo', 'departamento', 'papel', 'status', 'ações']} rows={rows} /></CrudPage>
 }
 
 function BotsPage({ data, onCreate, onEdit }: { data: BootstrapData; onCreate: () => void; onEdit: (item: AutomationBot) => void }) {
-  return <CrudCards title="Robos" subtitle="Automacoes simuladas prontas para ligar aos eventos do CRM." action="Criar robo" onCreate={onCreate} items={data.automationBots.map((bot) => ({ id: bot.id, title: bot.name, description: `${bot.trigger} -> ${bot.action}`, meta: bot.status, onEdit: () => onEdit(bot) }))} />
+  return <CrudCards title="Robôs" subtitle="Automações simuladas prontas para ligar aos eventos do CRM." action="Criar robô" onCreate={onCreate} items={data.automationBots.map((bot) => ({ id: bot.id, title: bot.name, description: `${bot.trigger} -> ${bot.action}`, meta: bot.status, onEdit: () => onEdit(bot) }))} />
 }
 
 function SettingsPage({ data, onEdit }: { data: BootstrapData; onEdit: () => void }) {
   const settings = data.settings[0]
+  const integrationLabels: Record<string, string> = { gupshup: 'Gupshup', meta: 'Meta WhatsApp', ihelp: 'IHelp', webhook: 'Webhook' }
   return (
     <section className="page-flow">
-      <div className="page-head"><PageIntro title="Configuracoes" subtitle="Conta, tema, canais, integracoes e webhooks." /><Button onClick={onEdit}><Settings size={16} /> Editar configuracoes</Button></div>
+      <div className="page-head"><PageIntro title="Configurações" subtitle="Conta, tema, canais, integrações e webhooks." /><Button onClick={onEdit}><Settings size={16} /> Editar configurações</Button></div>
       <section className="settings-hero panel">
         <div>
           <span className="eyebrow">Workspace</span>
@@ -1359,15 +1398,15 @@ function SettingsPage({ data, onEdit }: { data: BootstrapData; onEdit: () => voi
         </div>
         <div className="settings-summary">
           <span><strong>{settings.theme === 'dark' ? 'Escuro' : 'Claro'}</strong>Tema</span>
-          <span><strong>{settings.density === 'compact' ? 'Compacta' : 'Confortavel'}</strong>Densidade</span>
+          <span><strong>{settings.density === 'compact' ? 'Compacta' : 'Confortável'}</strong>Densidade</span>
           <span><strong>{settings.language}</strong>Idioma</span>
         </div>
       </section>
       <div className="settings-grid">
-        <section className="panel settings-card"><h2>Aparencia</h2><div className="theme-preview"><span style={{ background: settings.primaryColor }} /><div><strong>{settings.theme === 'dark' ? 'Tema escuro' : 'Tema claro'}</strong><p>{settings.density === 'compact' ? 'Densidade compacta' : 'Densidade confortavel'}</p></div></div></section>
-        <section className="panel settings-card"><h2>Localizacao</h2><p>{settings.timezone}</p><p>{settings.language}</p></section>
-        <section className="panel settings-card"><h2>Canais</h2><div className="tag-row">{data.channels.map((channel) => <Badge key={channel.id} color="#eff6ff">{channel.name} - {channel.status}</Badge>)}</div></section>
-        <section className="panel settings-card wide"><h2>Integracoes</h2>{Object.entries(settings.integrations).map(([key, value]) => <div className="list-row" key={key}><strong>{key}</strong><Badge color="#fef3c7">{value.status}</Badge><span>{value.tokenMasked || value.url}</span></div>)}</section>
+        <section className="panel settings-card"><h2>Aparência</h2><div className="theme-preview"><span style={{ background: settings.primaryColor }} /><div><strong>{settings.theme === 'dark' ? 'Tema escuro' : 'Tema claro'}</strong><p>{settings.density === 'compact' ? 'Densidade compacta' : 'Densidade confortável'}</p></div></div></section>
+        <section className="panel settings-card"><h2>Localização</h2><div className="settings-stack"><span><strong>Fuso horário</strong>{settings.timezone}</span><span><strong>Idioma</strong>{settings.language}</span></div></section>
+        <section className="panel settings-card wide"><h2>Canais</h2><div className="channel-settings">{data.channels.map((channel) => <article key={channel.id}><div><strong>{channel.name}</strong><span>{channel.type === 'whatsapp' ? 'WhatsApp' : 'Manual'}</span></div><Badge color="#dcfce7">{channel.status}</Badge></article>)}</div></section>
+        <section className="panel settings-card wide"><h2>Integrações</h2>{Object.entries(settings.integrations).map(([key, value]) => <div className="list-row" key={key}><strong>{integrationLabels[key] || key}</strong><Badge color="#fef3c7">{value.status}</Badge><span>{value.tokenMasked || value.url}</span></div>)}</section>
         <section className="panel settings-card"><h2>Webhook</h2><code>POST /api/webhooks/inbound-message</code></section>
       </div>
     </section>
@@ -1387,7 +1426,7 @@ function ProfilePage({ data, profile, onBack, onEdit }: { data: BootstrapData; p
         <div className="profile-checks">
           <span><Mail size={16} /> Email Verificado</span>
           <span><Phone size={16} /> WhatsApp Verificado</span>
-          <span><ShieldCheck size={16} /> Notificacoes {profile.notifications ? 'Ativado' : 'Desativado'}</span>
+          <span><ShieldCheck size={16} /> Notificações {profile.notifications ? 'Ativado' : 'Desativado'}</span>
           <span><Lock size={16} /> Duas etapas {profile.twoFactor ? 'Ativado' : 'Desativado'}</span>
         </div>
         <div className="tag-row">{data.departments.slice(0, 5).map((department) => <Badge key={department.id} color="#f1f5f9">{department.name}</Badge>)}</div>
@@ -1395,16 +1434,16 @@ function ProfilePage({ data, profile, onBack, onEdit }: { data: BootstrapData; p
       </aside>
       <main className="profile-main">
         <section className="panel">
-          <div className="page-head"><PageIntro title="Dados Pessoais" subtitle="Gerencie suas informacoes basicas de identificacao." /><Button onClick={onEdit}>Editar dados</Button></div>
+          <div className="page-head"><PageIntro title="Dados pessoais" subtitle="Gerencie suas informações básicas de identificação." /><Button onClick={onEdit}>Editar dados</Button></div>
           <div className="profile-details">
             <div><span>Nome</span><strong>{profile.name}</strong></div>
             <div><span>Email comercial</span><strong>{profile.email}</strong></div>
             <div><span>WhatsApp</span><strong>{profile.whatsapp}</strong></div>
-            <div><span>Cargo</span><strong>{profile.title || 'Nao informado'}</strong></div>
+            <div><span>Cargo</span><strong>{profile.title || 'Não informado'}</strong></div>
           </div>
         </section>
-        <section className="panel"><PageIntro title="Seguranca" subtitle="Atualize sua senha de acesso." /><div className="form-grid"><Field label="Senha Atual"><Input type="password" placeholder="Insira sua senha atual" /></Field><Field label="Nova Senha"><Input type="password" placeholder="Minimo 8 caracteres" /></Field><Field label="Confirmar Nova Senha"><Input type="password" placeholder="Repita a nova senha" /></Field></div><Button>Alterar Senha</Button></section>
-        <section className="panel"><PageIntro title="Aparencia" subtitle="O tema real fica em Configuracoes e muda todo o sistema." /><div className="profile-details"><div><span>Tema</span><strong>{data.settings[0].theme === 'dark' ? 'Escuro' : 'Claro'}</strong></div><div><span>Cor principal</span><strong>{data.settings[0].primaryColor}</strong></div><div><span>Densidade</span><strong>{data.settings[0].density === 'compact' ? 'Compacta' : 'Confortavel'}</strong></div></div></section>
+        <section className="panel"><PageIntro title="Segurança" subtitle="Atualize sua senha de acesso." /><div className="form-grid"><Field label="Senha atual"><Input type="password" placeholder="Insira sua senha atual" /></Field><Field label="Nova senha"><Input type="password" placeholder="Mínimo 8 caracteres" /></Field><Field label="Confirmar nova senha"><Input type="password" placeholder="Repita a nova senha" /></Field></div><Button>Alterar senha</Button></section>
+        <section className="panel"><PageIntro title="Aparência" subtitle="O tema real fica em Configurações e muda todo o sistema." /><div className="profile-details"><div><span>Tema</span><strong>{data.settings[0].theme === 'dark' ? 'Escuro' : 'Claro'}</strong></div><div><span>Cor principal</span><strong>{data.settings[0].primaryColor}</strong></div><div><span>Densidade</span><strong>{data.settings[0].density === 'compact' ? 'Compacta' : 'Confortável'}</strong></div></div></section>
       </main>
     </section>
   )
@@ -1449,18 +1488,18 @@ function FormModal({ mode, form, errors, data, saving, editing, onChange, onClos
   return (
     <Modal title={title} open onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Cancelar</Button><Button loading={saving} onClick={onSubmit}>Salvar</Button></>}>
       <div className="form-grid">
-        {mode === 'card' ? <>{field('title', 'Titulo obrigatorio', 'Ex: Atendimento - Maria')}{select('contactId', 'Contato', data.contacts)}{field('phone', 'Telefone', '+55 49 99999-9999')}{select('funnelId', 'Funil', data.funnels)}{select('stageId', 'Etapa', data.stages)}{select('departmentId', 'Departamento', data.departments)}{select('channelId', 'Canal', data.channels)}{select('assignedUserId', 'Responsavel', data.users)}{field('priority', 'Prioridade', 'normal')}{field('value', 'Valor', '0', 'number')}<Field label="Descricao"><TextArea value={String(form.description ?? '')} onChange={(event) => onChange('description', event.target.value)} /></Field>{field('dueAt', 'Data de retorno', '', 'date')}<Field label="Observacoes"><TextArea value={String(form.notes ?? '')} onChange={(event) => onChange('notes', event.target.value)} /></Field></> : null}
+        {mode === 'card' ? <>{field('title', 'Título obrigatório', 'Ex: Atendimento - Maria')}{select('contactId', 'Contato', data.contacts)}{field('phone', 'Telefone', '+55 49 99999-9999')}{select('funnelId', 'Funil', data.funnels)}{select('stageId', 'Etapa', data.stages)}{select('departmentId', 'Departamento', data.departments)}{select('channelId', 'Canal', data.channels)}{select('assignedUserId', 'Responsável', data.users)}{field('priority', 'Prioridade', 'normal')}{field('value', 'Valor', '0', 'number')}<Field label="Descrição"><TextArea value={String(form.description ?? '')} onChange={(event) => onChange('description', event.target.value)} /></Field>{field('dueAt', 'Data de retorno', '', 'date')}<Field label="Observações"><TextArea value={String(form.notes ?? '')} onChange={(event) => onChange('notes', event.target.value)} /></Field></> : null}
         {mode === 'stage' ? <>{field('name', 'Nome da etapa', 'Ex: Prova')}{select('funnelId', 'Funil', data.funnels)}<Field label="Cor"><Select value={String(form.color ?? 'blue')} onChange={(event) => onChange('color', event.target.value)}>{Object.keys(stageColors).map((color) => <option key={color}>{color}</option>)}</Select></Field>{field('order', 'Ordem', '0', 'number')}</> : null}
         {mode === 'funnel' ? <>{field('name', 'Nome do funil', 'Ex: Comercial') }<Field label="Status"><Select value={String(form.status ?? 'active')} onChange={(event) => onChange('status', event.target.value)}><option>active</option><option>archived</option></Select></Field></> : null}
         {mode === 'campaign' ? <>{field('name', 'Nome', 'Ex: Campanha Cascavel')}{select('channelId', 'Canal', data.channels)}<Field label="Mensagem" error={errors.message}><TextArea value={String(form.message ?? '')} onChange={(event) => onChange('message', event.target.value)} /></Field><Field label="Grupo/lista"><Select value={String(form.groupId ?? '')} onChange={(event) => onChange('groupId', event.target.value)}><option value="">Todos</option>{data.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</Select></Field>{field('scheduledAt', 'Agendar data/hora', '', 'datetime-local')}<Field label="Status"><Select value={String(form.status ?? 'Rascunho')} onChange={(event) => onChange('status', event.target.value)}>{['Rascunho', 'Agendado', 'Em andamento', 'Completo', 'Pausado'].map((status) => <option key={status}>{status}</option>)}</Select></Field></> : null}
-        {mode === 'emailTemplate' ? <>{field('name', 'Nome do template', 'Ex: Pos-consulta cardiologia')}{field('subject', 'Assunto', 'Orientacoes para sua consulta')}<Field label="Mensagem" error={errors.body}><TextArea value={String(form.body ?? '')} onChange={(event) => onChange('body', event.target.value)} /></Field><p className="muted">Use {'{{nome}}'} para o cliente e {'{{medico}}'} para o profissional.</p></> : null}
-        {mode === 'appointment' ? <>{field('title', 'Titulo', 'Ex: Consulta cardiologica')}<Field label="Tipo"><Select value={String(form.type ?? 'Consulta')} onChange={(event) => onChange('type', event.target.value)}>{['Consulta', 'Cirurgia', 'Reuniao', 'Retorno', 'Exame'].map((type) => <option key={type}>{type}</option>)}</Select></Field>{field('description', 'Descricao')}{field('date', 'Data', '', 'date')}{field('startTime', 'Hora inicial', '', 'time')}{field('endTime', 'Hora final', '', 'time')}{select('contactId', 'Paciente/contato', data.contacts)}{select('cardId', 'Lead/Card vinculado', data.cards.map((card) => ({ id: card.id, name: card.title })))}{select('departmentId', 'Setor clinico', data.departments)}{select('assignedUserId', 'Medico responsavel', doctors)}{field('room', 'Sala/consultorio', 'Consultorio 1')}<Field label="Status"><Select value={String(form.status ?? 'pendente')} onChange={(event) => onChange('status', event.target.value)}>{['pendente', 'confirmado', 'concluido', 'cancelado'].map((status) => <option key={status}>{status}</option>)}</Select></Field>{field('reminderMinutes', 'Lembrete (min)', '30', 'number')}<Field label="Observacoes"><TextArea value={String(form.notes ?? '')} onChange={(event) => onChange('notes', event.target.value)} /></Field></> : null}
+        {mode === 'emailTemplate' ? <>{field('name', 'Nome do template', 'Ex: Pós-consulta cardiologia')}{field('subject', 'Assunto', 'Orientações para sua consulta')}<Field label="Mensagem" error={errors.body}><TextArea value={String(form.body ?? '')} onChange={(event) => onChange('body', event.target.value)} /></Field><p className="muted">Use {'{{nome}}'} para o cliente e {'{{medico}}'} para o profissional.</p></> : null}
+        {mode === 'appointment' ? <>{field('title', 'Título', 'Ex: Consulta cardiológica')}<Field label="Tipo"><Select value={String(form.type ?? 'Consulta')} onChange={(event) => onChange('type', event.target.value)}>{['Consulta', 'Cirurgia', 'Reunião', 'Retorno', 'Exame'].map((type) => <option key={type}>{type}</option>)}</Select></Field>{field('description', 'Descrição')}{field('date', 'Data', '', 'date')}{field('startTime', 'Hora inicial', '', 'time')}{field('endTime', 'Hora final', '', 'time')}{select('contactId', 'Paciente/contato', data.contacts)}{select('cardId', 'Lead/Card vinculado', data.cards.map((card) => ({ id: card.id, name: card.title })))}{select('departmentId', 'Setor clínico', data.departments)}{select('assignedUserId', 'Médico responsável', doctors)}{field('room', 'Sala/consultório', 'Consultório 1')}<Field label="Status"><Select value={String(form.status ?? 'pendente')} onChange={(event) => onChange('status', event.target.value)}>{['pendente', 'confirmado', 'concluido', 'cancelado'].map((status) => <option key={status}>{status}</option>)}</Select></Field>{field('reminderMinutes', 'Lembrete (min)', '30', 'number')}<Field label="Observações"><TextArea value={String(form.notes ?? '')} onChange={(event) => onChange('notes', event.target.value)} /></Field></> : null}
         {mode === 'contact' ? <>{field('name', 'Nome')}{field('phone', 'Telefone')}{field('email', 'Email', '', 'email')}{select('channelId', 'Canal origem', data.channels)}{select('departmentId', 'Departamento', data.departments)}</> : null}
-        {mode === 'department' ? <>{field('name', 'Nome')}{field('description', 'Descricao')}<Field label="Cor"><Select value={String(form.color ?? 'red')} onChange={(event) => onChange('color', event.target.value)}>{Object.keys(stageColors).map((color) => <option key={color}>{color}</option>)}</Select></Field></> : null}
-        {mode === 'user' ? <>{field('name', 'Nome')}{field('email', 'Email', '', 'email')}{field('title', 'Cargo')}{field('specialty', 'Especialidade medica', 'Cardiologia')}{field('crm', 'CRM/registro', 'CRM-SP 000000')}{select('departmentId', 'Departamento', data.departments)}<Field label="Papel/permissao"><Select value={String(form.role ?? 'atendente')} onChange={(event) => onChange('role', event.target.value)}><option>administrador</option><option>supervisor</option><option>medico</option><option>atendente</option></Select></Field><Field label="Status"><Select value={String(form.status ?? 'active')} onChange={(event) => onChange('status', event.target.value)}><option>active</option><option>inactive</option></Select></Field></> : null}
-        {mode === 'group' ? <>{field('name', 'Nome')}{field('description', 'Descricao')}<Field label="Contatos"><Select multiple value={(form.contactIds as string[]) || []} onChange={(event) => onChange('contactIds', Array.from(event.target.selectedOptions).map((option) => option.value))}>{data.contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.name}</option>)}</Select></Field></> : null}
+        {mode === 'department' ? <>{field('name', 'Nome')}{field('description', 'Descrição')}<Field label="Cor"><Select value={String(form.color ?? 'red')} onChange={(event) => onChange('color', event.target.value)}>{Object.keys(stageColors).map((color) => <option key={color}>{color}</option>)}</Select></Field></> : null}
+        {mode === 'user' ? <>{field('name', 'Nome')}{field('email', 'Email', '', 'email')}{field('title', 'Cargo')}{field('specialty', 'Especialidade médica', 'Cardiologia')}{field('crm', 'CRM/registro', 'CRM-SP 000000')}{select('departmentId', 'Departamento', data.departments)}<Field label="Papel/permissão"><Select value={String(form.role ?? 'atendente')} onChange={(event) => onChange('role', event.target.value)}><option value="administrador">administrador</option><option value="supervisor">supervisor</option><option value="medico">médico</option><option value="atendente">atendente</option></Select></Field><Field label="Status"><Select value={String(form.status ?? 'active')} onChange={(event) => onChange('status', event.target.value)}><option>active</option><option>inactive</option></Select></Field></> : null}
+        {mode === 'group' ? <>{field('name', 'Nome')}{field('description', 'Descrição')}<Field label="Contatos"><Select multiple value={(form.contactIds as string[]) || []} onChange={(event) => onChange('contactIds', Array.from(event.target.selectedOptions).map((option) => option.value))}>{data.contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.name}</option>)}</Select></Field></> : null}
         {mode === 'bot' ? <>{field('name', 'Nome')}{field('trigger', 'Gatilho', 'novo atendimento')}{field('condition', 'Condicao', 'canal = WhatsApp')}{field('action', 'Acao', 'enviar mensagem')}<Field label="Status"><Select value={String(form.status ?? 'active')} onChange={(event) => onChange('status', event.target.value)}><option>active</option><option>inactive</option></Select></Field></> : null}
-        {mode === 'profile' ? <>{field('name', 'Nome')}{field('email', 'Email comercial', '', 'email')}{field('whatsapp', 'WhatsApp')}{field('title', 'Cargo opcional')}<Field label="Notificacoes"><Select value={String(form.notifications ?? true)} onChange={(event) => onChange('notifications', event.target.value === 'true')}><option value="true">Ativado</option><option value="false">Desativado</option></Select></Field><Field label="Autenticacao em duas etapas"><Select value={String(form.twoFactor ?? false)} onChange={(event) => onChange('twoFactor', event.target.value === 'true')}><option value="true">Ativado</option><option value="false">Desativado</option></Select></Field></> : null}
+        {mode === 'profile' ? <>{field('name', 'Nome')}{field('email', 'Email comercial', '', 'email')}{field('whatsapp', 'WhatsApp')}{field('title', 'Cargo opcional')}<Field label="Notificações"><Select value={String(form.notifications ?? true)} onChange={(event) => onChange('notifications', event.target.value === 'true')}><option value="true">Ativado</option><option value="false">Desativado</option></Select></Field><Field label="Autenticação em duas etapas"><Select value={String(form.twoFactor ?? false)} onChange={(event) => onChange('twoFactor', event.target.value === 'true')}><option value="true">Ativado</option><option value="false">Desativado</option></Select></Field></> : null}
         {mode === 'settings' ? <>{field('companyName', 'Nome do workspace')}{field('email', 'Email', '', 'email')}{field('phone', 'Telefone')}{field('timezone', 'Timezone')}{field('language', 'Idioma')}<Field label="Tema"><Select value={String(form.theme ?? 'light')} onChange={(event) => onChange('theme', event.target.value)}><option>light</option><option>dark</option></Select></Field>{field('primaryColor', 'Cor principal', '#ef5a3c', 'color')}<Field label="Densidade"><Select value={String(form.density ?? 'comfortable')} onChange={(event) => onChange('density', event.target.value)}><option>comfortable</option><option>compact</option></Select></Field></> : null}
       </div>
     </Modal>
@@ -1486,7 +1525,7 @@ function defaultForm(mode: FormMode, seed: object): FormState {
     stage: { name: '', funnelId: 'funnel_gravacao', color: 'blue', order: 0, ...safeSeed },
     funnel: { name: '', status: 'active', ...safeSeed },
     campaign: { name: '', channelId: 'channel_7', message: '', status: 'Rascunho', scheduledAt: '', ...safeSeed },
-    emailTemplate: { name: '', subject: '', body: 'Ola {{nome}}, segue a orientacao de {{medico}}.', ownerUserId: 'user_admin', ...safeSeed },
+    emailTemplate: { name: '', subject: '', body: 'Olá {{nome}}, segue a orientação de {{medico}}.', ownerUserId: 'user_admin', ...safeSeed },
     appointment: { title: '', type: 'Consulta', description: '', date: '', startTime: '', endTime: '', contactId: '', cardId: '', departmentId: 'dep_consultorios', assignedUserId: '', room: '', status: 'pendente', reminderMinutes: 30, notes: '', ...safeSeed },
     contact: { name: '', phone: '', email: '', channelId: 'channel_1', departmentId: 'dep_recepcao', ...safeSeed },
     department: { name: '', description: '', color: 'red', ...safeSeed },
@@ -1512,7 +1551,7 @@ function resourceForMode(mode: FormMode) {
 }
 
 function labelForMode(mode: FormMode) {
-  const map: Record<FormMode, string> = { card: 'Card', stage: 'Etapa', funnel: 'Funil', campaign: 'Campanha', emailTemplate: 'Template de Email', appointment: 'Agendamento', contact: 'Contato', department: 'Departamento', user: 'Usuario', group: 'Grupo', bot: 'Robo', profile: 'Perfil', settings: 'Configuracoes' }
+  const map: Record<FormMode, string> = { card: 'Card', stage: 'Etapa', funnel: 'Funil', campaign: 'Campanha', emailTemplate: 'Template de Email', appointment: 'Agendamento', contact: 'Contato', department: 'Departamento', user: 'Usuário', group: 'Grupo', bot: 'Robô', profile: 'Perfil', settings: 'Configurações' }
   return map[mode]
 }
 
