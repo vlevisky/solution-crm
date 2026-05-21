@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import {
   DndContext,
   type DragEndEvent,
@@ -28,6 +28,7 @@ import {
   LayoutDashboard,
   List,
   Lock,
+  LogOut,
   Mail,
   MessageCircle,
   MoreHorizontal,
@@ -141,6 +142,17 @@ const pageTitles: Record<Page, string> = {
   perfil: 'Meu Perfil',
 }
 
+const sessionKey = 'solution-crm-user'
+
+function isAdmin(user?: User | null) {
+  return user?.role === 'administrador'
+}
+
+function allowedPagesFor(user: User): Page[] {
+  if (isAdmin(user)) return Object.keys(pageTitles) as Page[]
+  return ['atendimento', 'crm', 'agendamentos', 'relatorios', 'dashboard', 'perfil']
+}
+
 function cleanMessageBody(body = '') {
   return body.replace(/\\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 }
@@ -193,6 +205,74 @@ function monthDays(month: string) {
   return Array.from({ length: total }, (_, index) => `${year}-${String(monthNumber).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`)
 }
 
+function reportData(data: BootstrapData): BootstrapData['reports'] {
+  const openCards = data.cards.filter((card) => card.status !== 'concluido')
+  const closedCards = data.cards.filter((card) => card.status === 'concluido')
+  const today = new Date().toISOString().slice(0, 10)
+  const byDepartment = data.departments.map((department) => ({
+    name: department.name,
+    total: data.cards.filter((card) => card.departmentId === department.id).length + data.contacts.filter((contact) => contact.departmentId === department.id).length,
+  }))
+  const byStage = data.stages.map((stage) => ({ name: stage.name, cards: data.cards.filter((card) => card.stageId === stage.id).length, color: stageColors[stage.color] || stage.color }))
+  const byChannel = data.channels.map((channel) => ({ name: channel.name, total: data.cards.filter((card) => card.channelId === channel.id).length }))
+  const campaignPerformance = data.campaigns.map((campaign) => ({ name: campaign.name, entregues: campaign.deliveredCount, lidas: campaign.readCount, respostas: campaign.repliedCount }))
+  const appointmentsWeek = data.appointments.slice(0, 7).map((appointment) => ({ name: appointment.date.slice(5), total: data.appointments.filter((item) => item.date === appointment.date).length }))
+  const table = data.cards.map((card) => {
+    const contact = data.contacts.find((item) => item.id === card.contactId)
+    return {
+      id: card.id,
+      contact: contact?.name || card.title,
+      phone: card.phone,
+      channel: data.channels.find((item) => item.id === card.channelId)?.name || 'N/D',
+      department: data.departments.find((item) => item.id === card.departmentId)?.name || 'N/D',
+      responsible: data.users.find((item) => item.id === card.assignedUserId)?.name || 'N/D',
+      status: card.status,
+      createdAt: card.createdAt,
+      updatedAt: card.updatedAt,
+      openTime: card.status === 'concluido' ? 'Encerrado' : '02:16:58',
+      stage: data.stages.find((item) => item.id === card.stageId)?.name || 'N/D',
+    }
+  })
+  return {
+    summary: {
+      contacts: data.contacts.length,
+      openAttendances: openCards.length,
+      cards: data.cards.length,
+      appointmentsToday: data.appointments.filter((item) => item.date === today).length,
+      activeCampaigns: data.campaigns.filter((item) => ['Agendado', 'Em andamento'].includes(item.status)).length,
+      departments: data.departments.length,
+      users: data.users.length,
+      conversionRate: data.cards.length ? Math.round((closedCards.length / data.cards.length) * 100) : 0,
+      closedAttendances: closedCards.length,
+      totalAttendances: data.cards.length,
+      active: openCards.filter((card) => card.lastMessageAt).length,
+      receptive: data.messages.filter((message) => message.direction === 'inbound').length,
+      waiting: openCards.length,
+      avgWait: '02:16:58',
+      avgService: '232:25:04',
+      activeWait: '12:59:00',
+      cardsCreated: data.cards.length,
+      cardsWon: closedCards.length,
+      campaignsSent: data.campaigns.reduce((sum, campaign) => sum + campaign.sentCount, 0),
+      appointmentsDone: data.appointments.filter((item) => item.status === 'concluido').length,
+    },
+    charts: { byDepartment, byStage, byChannel, campaignPerformance, appointmentsWeek },
+    table,
+  }
+}
+
+function scopeDataForUser(data: BootstrapData, user: User): BootstrapData {
+  if (isAdmin(user)) return data
+  const cards = data.cards.filter((card) => card.assignedUserId === user.id)
+  const appointments = data.appointments.filter((appointment) => appointment.assignedUserId === user.id)
+  const contactIds = new Set([...cards.map((card) => card.contactId), ...appointments.map((appointment) => appointment.contactId)].filter(Boolean))
+  const cardIds = new Set(cards.map((card) => card.id))
+  const contacts = data.contacts.filter((contact) => contactIds.has(contact.id))
+  const messages = data.messages.filter((message) => contactIds.has(message.contactId) || cardIds.has(message.cardId))
+  const scoped: BootstrapData = { ...data, cards, appointments, contacts, messages, campaigns: [], automationBots: data.automationBots.filter((bot) => bot.status === 'active'), activityLogs: data.activityLogs.filter((log) => log.userId === user.id).slice(0, 8) }
+  return { ...scoped, reports: reportData(scoped) }
+}
+
 function App() {
   return (
     <ToastProvider>
@@ -204,6 +284,15 @@ function App() {
 function SolutionCrm() {
   const toast = useToast()
   const [data, setData] = useState<BootstrapData | null>(null)
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const raw = window.localStorage.getItem(sessionKey)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as User
+    } catch {
+      return null
+    }
+  })
   const [activePage, setActivePage] = useState<Page>('atendimento')
   const [collapsed, setCollapsed] = useState(false)
   const [selectedFunnelId, setSelectedFunnelId] = useState('funnel_gravacao')
@@ -220,6 +309,20 @@ function SolutionCrm() {
   const [confirm, setConfirm] = useState<{ resource: string; id: string; title: string; description: string } | null>(null)
   const [drawer, setDrawer] = useState<{ type: 'contact' | 'appointment' | 'stage' | 'campaign'; id?: string } | null>(null)
   const [messageText, setMessageText] = useState('')
+
+  async function login(email: string, password: string) {
+    const result = await api.login({ email, password })
+    setCurrentUser(result.user)
+    window.localStorage.setItem(sessionKey, JSON.stringify(result.user))
+    toast.push({ type: 'success', title: `Bem-vindo, ${result.user.name}` })
+  }
+
+  function logout() {
+    window.localStorage.removeItem(sessionKey)
+    setCurrentUser(null)
+    setActivePage('atendimento')
+    setSelectedContactId('')
+  }
 
   async function refresh() {
     const next = await api.bootstrap()
@@ -238,6 +341,12 @@ function SolutionCrm() {
       active = false
     }
   }, [toast])
+
+  useEffect(() => {
+    if (!currentUser) return
+    const allowed = allowedPagesFor(currentUser)
+    if (!allowed.includes(activePage)) setActivePage('atendimento')
+  }, [activePage, currentUser])
 
   const lookup = useMemo(() => {
     const map = <T extends { id: string }>(items: T[]) => Object.fromEntries(items.map((item) => [item.id, item])) as Record<string, T>
@@ -258,12 +367,29 @@ function SolutionCrm() {
     return <Skeleton />
   }
 
-  const selectedFunnel = data.funnels.find((funnel) => funnel.id === selectedFunnelId) || data.funnels[0]
-  const funnelStages = data.stages.filter((stage) => stage.funnelId === selectedFunnel?.id).sort((a, b) => a.order - b.order)
-  const selectedContact = data.contacts.find((contact) => contact.id === selectedContactId) || data.contacts[0]
-  const selectedCard = data.cards.find((card) => card.contactId === selectedContact?.id)
-  const selectedMessages = data.messages.filter((message) => message.contactId === selectedContact?.id)
+  if (!currentUser) {
+    return <LoginPage data={data} onLogin={login} />
+  }
+
+  const visibleData = scopeDataForUser(data, currentUser)
+  const visibleLookup = {
+    ...lookup,
+    contacts: Object.fromEntries(visibleData.contacts.map((item) => [item.id, item])) as Record<string, Contact>,
+  }
+  const selectedFunnel = visibleData.funnels.find((funnel) => funnel.id === selectedFunnelId) || visibleData.funnels[0]
+  const funnelStages = visibleData.stages.filter((stage) => stage.funnelId === selectedFunnel?.id).sort((a, b) => a.order - b.order)
+  const selectedContact = visibleData.contacts.find((contact) => contact.id === selectedContactId) || visibleData.contacts[0]
+  const selectedCard = visibleData.cards.find((card) => card.contactId === selectedContact?.id)
+  const selectedMessages = visibleData.messages.filter((message) => message.contactId === selectedContact?.id)
   const settings = data.settings[0]
+  const profileView = {
+    ...settings.profile,
+    id: currentUser.id,
+    name: currentUser.name,
+    email: currentUser.email,
+    title: currentUser.title,
+  }
+  const accountScope = isAdmin(currentUser) ? 'Administradora' : currentUser.specialty || currentUser.title || 'Medico'
 
   function openCreate(mode: FormMode, seed: FormState = {}) {
     setEditingId('')
@@ -317,7 +443,14 @@ function SolutionCrm() {
       const payload = normalizePayload(formMode, form)
       if (formMode === 'profile') {
         const settings = data!.settings[0]
-        await api.updateSettings({ profile: { ...settings.profile, ...payload } })
+        if (currentUser) {
+          const updatedUser = await api.update<User>('users', currentUser.id, payload)
+          setCurrentUser(updatedUser)
+          window.localStorage.setItem(sessionKey, JSON.stringify(updatedUser))
+        }
+        if (currentUser && isAdmin(currentUser)) {
+          await api.updateSettings({ profile: { ...settings.profile, ...payload } })
+        }
       } else if (formMode === 'settings') {
         await api.updateSettings(payload)
       } else {
@@ -382,7 +515,8 @@ function SolutionCrm() {
   }
 
   function downloadReport() {
-    const blob = new Blob([csv(data!.reports.table)], { type: 'text/csv;charset=utf-8' })
+    const reportSource = currentUser && data ? scopeDataForUser(data, currentUser) : data!
+    const blob = new Blob([csv(reportSource.reports.table)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -397,13 +531,13 @@ function SolutionCrm() {
       data-theme={settings.theme}
       style={{ ['--primary' as string]: settings.primaryColor || '#ef5a3c' }}
     >
-      <Sidebar activePage={activePage} collapsed={collapsed} accountName={settings.companyName} profileName={settings.profile.name} onNavigate={setActivePage} onToggle={() => setCollapsed((value) => !value)} />
+      <Sidebar activePage={activePage} collapsed={collapsed} accountName={settings.companyName} profileName={currentUser.name} accountScope={accountScope} allowedPages={allowedPagesFor(currentUser)} onNavigate={setActivePage} onToggle={() => setCollapsed((value) => !value)} />
       <main className="main">
-        <Topbar title={pageTitles[activePage]} accountName={settings.companyName} onOpenProfile={() => setActivePage('perfil')} />
+        <Topbar title={pageTitles[activePage]} accountName={settings.companyName} currentUser={currentUser} onOpenProfile={() => setActivePage('perfil')} onLogout={logout} />
         {activePage === 'atendimento' ? (
           <AttendancePage
-            data={data}
-            lookup={lookup}
+            data={visibleData}
+            lookup={visibleLookup}
             selectedContact={selectedContact}
             selectedCard={selectedCard}
             messages={selectedMessages}
@@ -416,15 +550,15 @@ function SolutionCrm() {
             setMessageText={setMessageText}
             onSend={sendMessage}
             onNewContact={() => openCreate('contact')}
-            onNewAppointment={() => openCreate('appointment', { contactId: selectedContact?.id, cardId: selectedCard?.id })}
-            onNewCard={() => openCreate('card', { contactId: selectedContact?.id, phone: selectedContact?.phone })}
+            onNewAppointment={() => openCreate('appointment', { contactId: selectedContact?.id, cardId: selectedCard?.id, assignedUserId: currentUser.id })}
+            onNewCard={() => openCreate('card', { contactId: selectedContact?.id, phone: selectedContact?.phone, assignedUserId: currentUser.id })}
             onOpenContact={() => setDrawer({ type: 'contact', id: selectedContact?.id })}
           />
         ) : null}
         {activePage === 'crm' ? (
           <CrmPage
-            data={data}
-            lookup={lookup}
+            data={visibleData}
+            lookup={visibleLookup}
             funnel={selectedFunnel}
             stages={funnelStages}
             search={search}
@@ -447,10 +581,10 @@ function SolutionCrm() {
             onDeleteFunnel={() => setConfirm({ resource: 'funnels', id: selectedFunnel.id, title: 'Excluir funil', description: `Deseja excluir o funil ${selectedFunnel.name}?` })}
           />
         ) : null}
-        {activePage === 'dashboard' ? <DashboardPage data={data} lookup={lookup} /> : null}
+        {activePage === 'dashboard' ? <DashboardPage data={visibleData} lookup={visibleLookup} /> : null}
         {activePage === 'campanhas' ? (
           <CampaignsPage
-            data={data}
+            data={visibleData}
             search={search}
             setSearch={setSearch}
             statusFilter={statusFilter}
@@ -467,8 +601,9 @@ function SolutionCrm() {
         ) : null}
         {activePage === 'agendamentos' ? (
           <AppointmentsPage
-            data={data}
-            lookup={lookup}
+            data={visibleData}
+            lookup={visibleLookup}
+            currentUser={currentUser}
             onCreate={(seed) => openCreate('appointment', seed || {})}
             onCreateDoctor={() => openCreate('user', { role: 'medico', title: 'Medico(a)', departmentId: 'dep_consultorios' })}
             onEdit={(appointment) => openEdit('appointment', appointment)}
@@ -476,29 +611,29 @@ function SolutionCrm() {
             onOpen={(appointment) => setDrawer({ type: 'appointment', id: appointment.id })}
           />
         ) : null}
-        {activePage === 'relatorios' ? <ReportsPage data={data} onExport={downloadReport} /> : null}
+        {activePage === 'relatorios' ? <ReportsPage data={visibleData} onExport={downloadReport} /> : null}
         {activePage === 'contatos' ? (
-          <ContactsPage data={data} lookup={lookup} search={search} setSearch={setSearch} onCreate={() => openCreate('contact')} onEdit={(contact) => openEdit('contact', contact)} />
+          <ContactsPage data={visibleData} lookup={visibleLookup} search={search} setSearch={setSearch} onCreate={() => openCreate('contact')} onEdit={(contact) => openEdit('contact', contact)} />
         ) : null}
         {activePage === 'grupos' ? (
-          <GroupsPage data={data} onCreate={() => openCreate('group')} onEdit={(group) => openEdit('group', group)} onDelete={(group) => setConfirm({ resource: 'groups', id: group.id, title: 'Excluir grupo', description: `Deseja excluir ${group.name}?` })} />
+          <GroupsPage data={visibleData} onCreate={() => openCreate('group')} onEdit={(group) => openEdit('group', group)} onDelete={(group) => setConfirm({ resource: 'groups', id: group.id, title: 'Excluir grupo', description: `Deseja excluir ${group.name}?` })} />
         ) : null}
         {activePage === 'departamentos' ? (
-          <DepartmentsPage data={data} onCreate={() => openCreate('department')} onEdit={(department) => openEdit('department', department)} onDelete={(department) => setConfirm({ resource: 'departments', id: department.id, title: 'Excluir departamento', description: `Deseja excluir ${department.name}? Escolha mover vinculos para outro setor em uma evolucao com banco relacional.` })} />
+          <DepartmentsPage data={visibleData} onCreate={() => openCreate('department')} onEdit={(department) => openEdit('department', department)} onDelete={(department) => setConfirm({ resource: 'departments', id: department.id, title: 'Excluir departamento', description: `Deseja excluir ${department.name}? Escolha mover vinculos para outro setor em uma evolucao com banco relacional.` })} />
         ) : null}
         {activePage === 'usuarios' ? (
-          <UsersPage data={data} lookup={lookup} onCreate={() => openCreate('user')} onEdit={(user) => openEdit('user', user)} onDelete={(user) => setConfirm({ resource: 'users', id: user.id, title: 'Remover usuario', description: `Deseja remover ${user.name}?` })} />
+          <UsersPage data={visibleData} lookup={visibleLookup} onCreate={() => openCreate('user')} onEdit={(user) => openEdit('user', user)} onDelete={(user) => setConfirm({ resource: 'users', id: user.id, title: 'Remover usuario', description: `Deseja remover ${user.name}?` })} />
         ) : null}
-        {activePage === 'robos' ? <BotsPage data={data} onCreate={() => openCreate('bot')} onEdit={(bot) => openEdit('bot', bot)} /> : null}
+        {activePage === 'robos' ? <BotsPage data={visibleData} onCreate={() => openCreate('bot')} onEdit={(bot) => openEdit('bot', bot)} /> : null}
         {activePage === 'configuracoes' ? <SettingsPage data={data} onEdit={() => openEdit('settings', data.settings[0])} /> : null}
-        {activePage === 'perfil' ? <ProfilePage data={data} onBack={() => setActivePage('dashboard')} onEdit={() => openEdit('profile', data.settings[0].profile)} /> : null}
+        {activePage === 'perfil' ? <ProfilePage data={data} profile={profileView} onBack={() => setActivePage('dashboard')} onEdit={() => openEdit('profile', profileView)} /> : null}
       </main>
 
       <FormModal
         mode={formMode}
         form={form}
         errors={errors}
-        data={data}
+        data={visibleData}
         saving={saving}
         editing={Boolean(editingId)}
         onChange={(key, value) => setForm((current) => ({ ...current, [key]: value }))}
@@ -506,18 +641,80 @@ function SolutionCrm() {
         onSubmit={submitForm}
       />
       <ConfirmDialog open={Boolean(confirm)} title={confirm?.title || ''} description={confirm?.description || ''} danger onCancel={() => setConfirm(null)} onConfirm={removeConfirmed} confirmText="Excluir" />
-      <EntityDrawer drawer={drawer} data={data} lookup={lookup} onClose={() => setDrawer(null)} onEdit={(mode, item) => openEdit(mode, item)} />
+      <EntityDrawer drawer={drawer} data={visibleData} lookup={visibleLookup} onClose={() => setDrawer(null)} onEdit={(mode, item) => openEdit(mode, item)} />
     </div>
   )
 }
 
-function Sidebar({ activePage, collapsed, accountName, profileName, onNavigate, onToggle }: { activePage: Page; collapsed: boolean; accountName: string; profileName: string; onNavigate: (page: Page) => void; onToggle: () => void }) {
-  const sections: Array<{ title: string; items: Array<{ page: Page; icon: ReactNode; label: string }> }> = [
+function LoginPage({ data, onLogin }: { data: BootstrapData; onLogin: (email: string, password: string) => Promise<void> }) {
+  const toast = useToast()
+  const [email, setEmail] = useState('marina@clinicasolution.com')
+  const [password, setPassword] = useState('123456')
+  const [loading, setLoading] = useState(false)
+  const demoUsers = data.users.filter((user) => user.role === 'administrador' || user.role === 'medico')
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setLoading(true)
+    try {
+      await onLogin(email, password)
+    } catch (error) {
+      toast.push({ type: 'error', title: 'Nao foi possivel entrar', message: error instanceof Error ? error.message : 'Erro desconhecido' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <main className="login-shell">
+      <section className="login-branding">
+        <div className="brand-mark"><Activity size={22} /></div>
+        <span className="eyebrow">Solution CRM</span>
+        <h1>Atendimento clinico com acesso por perfil.</h1>
+        <p>Administradores acompanham toda a operacao. Medicos entram direto nos atendimentos, agenda e relatorios vinculados a eles.</p>
+        <div className="login-preview">
+          <div><strong>{data.cards.length}</strong><span>atendimentos</span></div>
+          <div><strong>{data.appointments.length}</strong><span>agendamentos</span></div>
+          <div><strong>{data.users.filter((user) => user.role === 'medico').length}</strong><span>medicos</span></div>
+        </div>
+      </section>
+      <section className="login-panel">
+        <div>
+          <span className="eyebrow">Acesso seguro</span>
+          <h2>Entrar no CRM</h2>
+          <p className="muted">Use uma das contas de demonstracao. Senha: 123456.</p>
+        </div>
+        <form onSubmit={submit} className="login-form">
+          <Field label="Email">
+            <Input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" />
+          </Field>
+          <Field label="Senha">
+            <Input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" />
+          </Field>
+          <Button loading={loading} type="submit">Entrar</Button>
+        </form>
+        <div className="login-users">
+          {demoUsers.map((user) => (
+            <button type="button" key={user.id} onClick={() => { setEmail(user.email); setPassword('123456') }}>
+              <span className="avatar">{initials(user.name)}</span>
+              <strong>{user.name}</strong>
+              <small>{user.role === 'administrador' ? 'Administradora - ve tudo' : `${user.specialty || user.title} - ve apenas seus atendimentos`}</small>
+            </button>
+          ))}
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function Sidebar({ activePage, collapsed, accountName, profileName, accountScope, allowedPages, onNavigate, onToggle }: { activePage: Page; collapsed: boolean; accountName: string; profileName: string; accountScope: string; allowedPages: Page[]; onNavigate: (page: Page) => void; onToggle: () => void }) {
+  const baseSections: Array<{ title: string; items: Array<{ page: Page; icon: ReactNode; label: string }> }> = [
     { title: 'PRINCIPAL', items: [{ page: 'atendimento', icon: <MessageCircle />, label: 'Atendimento' }, { page: 'crm', icon: <BriefcaseBusiness />, label: 'CRM' }, { page: 'robos', icon: <Bot />, label: 'Robos' }] },
     { title: 'OPERACOES', items: [{ page: 'campanhas', icon: <Send />, label: 'Campanhas' }, { page: 'agendamentos', icon: <CalendarDays />, label: 'Agendamentos' }, { page: 'contatos', icon: <ClipboardList />, label: 'Contatos' }, { page: 'grupos', icon: <Users />, label: 'Grupos' }] },
     { title: 'DADOS', items: [{ page: 'relatorios', icon: <BarChart3 />, label: 'Relatorios' }, { page: 'dashboard', icon: <LayoutDashboard />, label: 'Dashboard' }] },
     { title: 'SISTEMA', items: [{ page: 'departamentos', icon: <Inbox />, label: 'Departamentos' }, { page: 'usuarios', icon: <UserPlus />, label: 'Usuarios' }, { page: 'configuracoes', icon: <Settings />, label: 'Configuracoes' }, { page: 'perfil', icon: <CircleUserRound />, label: 'Meu Perfil' }] },
   ]
+  const sections = baseSections.map((section) => ({ ...section, items: section.items.filter((item) => allowedPages.includes(item.page)) })).filter((section) => section.items.length)
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -540,14 +737,14 @@ function Sidebar({ activePage, collapsed, accountName, profileName, onNavigate, 
       </nav>
       <div className="side-profile">
         <div className="avatar">{initials(profileName)}</div>
-        {!collapsed ? <div><strong>{profileName}</strong><span>Conta medica</span></div> : null}
+        {!collapsed ? <div><strong>{profileName}</strong><span>{accountScope}</span></div> : null}
         {!collapsed ? <MoreHorizontal size={18} /> : null}
       </div>
     </aside>
   )
 }
 
-function Topbar({ title, accountName, onOpenProfile }: { title: string; accountName: string; onOpenProfile: () => void }) {
+function Topbar({ title, accountName, currentUser, onOpenProfile, onLogout }: { title: string; accountName: string; currentUser: User; onOpenProfile: () => void; onLogout: () => void }) {
   return (
     <header className="topbar">
       <div>
@@ -555,8 +752,10 @@ function Topbar({ title, accountName, onOpenProfile }: { title: string; accountN
         <h1>{title}</h1>
       </div>
       <div className="top-actions">
+        <span className="session-chip">{currentUser.role === 'administrador' ? 'Visao geral' : 'Meus atendimentos'}</span>
         <Button variant="secondary"><Search size={16} /> Busca global</Button>
         <IconButton aria-label="Abrir perfil" onClick={onOpenProfile}><CircleUserRound size={22} /></IconButton>
+        <IconButton aria-label="Sair" onClick={onLogout}><LogOut size={20} /></IconButton>
       </div>
     </header>
   )
@@ -859,14 +1058,15 @@ function CampaignsPage({ data, search, setSearch, statusFilter, setStatusFilter,
   )
 }
 
-function AppointmentsPage({ data, lookup, onCreate, onCreateDoctor, onEdit, onDelete, onOpen }: { data: BootstrapData; lookup: Lookup; onCreate: (seed?: FormState) => void; onCreateDoctor: () => void; onEdit: (item: Appointment) => void; onDelete: (item: Appointment) => void; onOpen: (item: Appointment) => void }) {
+function AppointmentsPage({ data, lookup, currentUser, onCreate, onCreateDoctor, onEdit, onDelete, onOpen }: { data: BootstrapData; lookup: Lookup; currentUser: User; onCreate: (seed?: FormState) => void; onCreateDoctor: () => void; onEdit: (item: Appointment) => void; onDelete: (item: Appointment) => void; onOpen: (item: Appointment) => void }) {
   const [view, setView] = useState<'mes' | 'semana' | 'lista'>('mes')
-  const [doctorFilter, setDoctorFilter] = useState('Todos')
+  const canManageDoctors = isAdmin(currentUser)
+  const [doctorFilter, setDoctorFilter] = useState(canManageDoctors ? 'Todos' : currentUser.id)
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const nextAppointment = data.appointments.map((item) => item.date).sort()[0]
     return (nextAppointment || new Date().toISOString().slice(0, 10)).slice(0, 7)
   })
-  const doctors = data.users.filter((user) => user.role === 'medico' || user.title.toLowerCase().includes('medic') || user.title.toLowerCase().includes('médic'))
+  const doctors = canManageDoctors ? data.users.filter((user) => user.role === 'medico' || user.title.toLowerCase().includes('medic') || user.title.toLowerCase().includes('médic')) : [currentUser]
   const appointments = data.appointments.filter((appointment) => doctorFilter === 'Todos' || appointment.assignedUserId === doctorFilter)
   const visibleAppointments = appointments.filter((appointment) => view === 'lista' || appointment.date.startsWith(selectedMonth))
   const defaultDoctorId = doctorFilter !== 'Todos' ? doctorFilter : doctors[0]?.id || ''
@@ -884,7 +1084,7 @@ function AppointmentsPage({ data, lookup, onCreate, onCreateDoctor, onEdit, onDe
       <div className="page-head">
         <PageIntro title="Agenda medica" subtitle="Controle consultas, cirurgias, exames, retornos e reunioes por medico." />
         <div className="top-actions">
-          <Button variant="secondary" onClick={onCreateDoctor}><UserPlus size={16} /> Novo medico</Button>
+          {canManageDoctors ? <Button variant="secondary" onClick={onCreateDoctor}><UserPlus size={16} /> Novo medico</Button> : null}
           <Button onClick={() => onCreate({ assignedUserId: defaultDoctorId })}><Plus size={16} /> Novo Agendamento</Button>
         </div>
       </div>
@@ -900,7 +1100,7 @@ function AppointmentsPage({ data, lookup, onCreate, onCreateDoctor, onEdit, onDe
       </section>
       <div className="filters-line panel">
         <div className="segmented wide">{['mes', 'semana', 'lista'].map((item) => <button className={view === item ? 'active' : ''} key={item} onClick={() => setView(item as 'mes')}>{item}</button>)}</div>
-        <Field label="Medico"><Select value={doctorFilter} onChange={(event) => setDoctorFilter(event.target.value)}><option>Todos</option>{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name} - {doctor.specialty || doctor.title}</option>)}</Select></Field>
+        <Field label="Medico"><Select value={doctorFilter} onChange={(event) => setDoctorFilter(event.target.value)} disabled={!canManageDoctors}>{canManageDoctors ? <option>Todos</option> : null}{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name} - {doctor.specialty || doctor.title}</option>)}</Select></Field>
         <div className="month-switcher">
           <IconButton aria-label="Mes anterior" onClick={() => shiftMonth(-1)}><ChevronLeft size={16} /></IconButton>
           <strong>{monthLabel(selectedMonth)}</strong>
@@ -1018,8 +1218,7 @@ function SettingsPage({ data, onEdit }: { data: BootstrapData; onEdit: () => voi
   )
 }
 
-function ProfilePage({ data, onBack, onEdit }: { data: BootstrapData; onBack: () => void; onEdit: () => void }) {
-  const profile = data.settings[0].profile
+function ProfilePage({ data, profile, onBack, onEdit }: { data: BootstrapData; profile: BootstrapData['settings'][number]['profile'] & { id?: string }; onBack: () => void; onEdit: () => void }) {
   return (
     <section className="profile-page">
       <button className="back-link" onClick={onBack}><ChevronLeft size={20} /> Meu perfil</button>

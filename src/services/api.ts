@@ -1,4 +1,4 @@
-import type { BootstrapData } from '../types'
+import type { BootstrapData, User } from '../types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -11,6 +11,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  login: (payload: { email: string; password: string }) => request<{ user: User; demoPassword?: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   bootstrap: () => request<BootstrapData>('/api/bootstrap'),
   create: <T>(resource: string, payload: unknown) => request<T>(`/api/${resource}`, { method: 'POST', body: JSON.stringify(payload) }),
   update: <T>(resource: string, id: string, payload: unknown) => request<T>(`/api/${resource}/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),

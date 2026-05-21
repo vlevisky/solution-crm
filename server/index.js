@@ -384,6 +384,21 @@ function reportData(data) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, provider: provider.constructor.name }))
 
+app.post('/api/auth/login', async (req, res, next) => {
+  try {
+    const data = await readDb()
+    const email = clean(req.body.email || '').toLowerCase()
+    const password = String(req.body.password || '')
+    const user = data.users.find((item) => item.email.toLowerCase() === email)
+    if (!user || !['123456', 'solution'].includes(password)) {
+      return res.status(401).json({ error: 'Email ou senha invalidos' })
+    }
+    res.json({ user, demoPassword: '123456' })
+  } catch (error) {
+    next(error)
+  }
+})
+
 app.get('/api/bootstrap', async (_req, res, next) => {
   try {
     const data = await readDb()
